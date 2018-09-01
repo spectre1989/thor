@@ -471,24 +471,28 @@ int main(int argc, const char** argv)
 		printf("(fpos=%d)\n", file_get_position(bin_file));
 		uint32 u_2 = file_read_u32(bin_file);
 
+		uint32 defs_read = 0;
 		while (true)
 		{
-			printf("(fpos=%d)\n", file_get_position(bin_file));
+			// Read def
+			
+
+			//printf("(fpos=%d)\n", file_get_position(bin_file));
 
 			uint32 size = file_read_u32(bin_file);
 			uint32 group_beginning = file_get_position(bin_file);
 
-			bin_file_read_string(bin_file, buffer); // group name
-			printf("%s\n", buffer);
+			bin_file_read_string(bin_file, buffer); // name
+			//printf("%s\n", buffer);
 
-			uint32 n = file_read_u32(bin_file);
-			printf("%d items\n", n);
+			uint32 num_groups = file_read_u32(bin_file);
+			//printf("%d items\n", n);
 
-			for (uint32 i = 0; i < n; ++i)
+			for (uint32 i = 0; i < num_groups; ++i)
 			{
-				printf("(fpos=%d)\n", file_get_position(bin_file));
+				//printf("(fpos=%d)\n", file_get_position(bin_file));
 				uint32 type = file_read_u32(bin_file);
-				assert(type == 0x6c || type == 116 || type == 36 || type == 104); // not sure what this is.. struct type? group id?
+				//assert(type == 0x6c || type == 116 || type == 36 || type == 104); // not sure what this is.. struct type? group id?
 
 				bin_file_read_string(bin_file, buffer); // name
 				float32 x, y, z;
@@ -501,10 +505,57 @@ int main(int argc, const char** argv)
 				d3 = file_read_f32(bin_file);
 				flags = file_read_u32(bin_file);
 
-				printf("%s (%f, %f, %f) (%f, %f, %f) %d\n", buffer, x, y, z, d1, d2, d3, flags);
+				//printf("%s (%f, %f, %f) (%f, %f, %f) %d\n", buffer, x, y, z, d1, d2, d3, flags);
 			}
 
-			file_set_position(bin_file, group_beginning + size);
+			uint32 property_count = file_read_u32(bin_file);
+			assert(property_count == 0);
+			uint32 tint_color_count = file_read_u32(bin_file);
+			assert(tint_color_count == 0);
+			uint32 ambient_count = file_read_u32(bin_file);
+			assert(ambient_count == 0);
+			uint32 omni_count = file_read_u32(bin_file);
+			assert(omni_count == 0);
+			uint32 cubemap_count = file_read_u32(bin_file);
+			assert(cubemap_count == 0);
+			uint32 volume_count = file_read_u32(bin_file);
+			assert(volume_count == 0);
+			uint32 sound_count = file_read_u32(bin_file);
+			assert(sound_count == 0);
+			uint32 replace_tex_count = file_read_u32(bin_file);
+			assert(replace_tex_count == 0);
+
+			uint32 beacon_count = file_read_u32(bin_file);
+			for (uint32 i = 0; i < beacon_count; ++i)
+			{
+				uint32 type = file_read_u32(bin_file);
+				bin_file_read_string(bin_file, buffer); // name
+				float32 f32 = file_read_f32(bin_file); // todo(jbr) what is this?
+			}
+
+			uint32 fog_count = file_read_u32(bin_file);
+			assert(fog_count == 0);
+			uint32 lod_count = file_read_u32(bin_file);
+			assert(lod_count == 0);
+			bin_file_read_string(bin_file, buffer); // "Type"
+			uint32 flags = file_read_u32(bin_file);
+			float32 alpha = file_read_f32(bin_file);
+			bin_file_read_string(bin_file, buffer); // "Obj"
+
+			uint32 tex_swap_count = file_read_u32(bin_file);
+			for (uint32 i = 0; i < tex_swap_count; ++i)
+			{
+				uint32 type = file_read_u32(bin_file);
+
+				bin_file_read_string(bin_file, buffer); // todo(jbr) what are these?
+				bin_file_read_string(bin_file, buffer); 
+				uint32 u32 = file_read_u32(bin_file);
+			}
+
+			bin_file_read_string(bin_file, buffer); // "SoundScript"
+
+			//file_set_position(bin_file, group_beginning + size);
+			defs_read++;
 		}
 		
 	}
