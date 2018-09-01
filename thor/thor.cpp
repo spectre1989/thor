@@ -8,11 +8,13 @@
 typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
+typedef float float32;
 
 constexpr uint32 c_pigg_file_sig = 0x123;
 constexpr uint32 c_internal_file_sig = 0x3456;
 constexpr uint32 c_string_table_sig = 0x6789;
 constexpr uint32 c_slot_table_sig = 0x9abc;
+constexpr uint8 c_bin_file_sig[8] = { 0x43, 0x72, 0x79, 0x70, 0x74, 0x69, 0x63, 0x53 };
 constexpr uint32 c_invalid_id = (uint32)-1;
 
 constexpr uint32 kilobytes(uint32 n) { return n * 1024; }
@@ -73,12 +75,12 @@ static uint32 string_concat(const char* s1, const char* s2, char* dst)
 	return chars_copied;
 }
 
-static bool string_equals(const char* s1, const char* s2, uint32 max_chars)
+static bool bytes_equal(const uint8* a, const uint8* b, uint32 num_bytes)
 {
-	const char* s1_end = &s1[max_chars];
-	for (; s1 != s1_end; ++s1, ++s2)
+	const uint8* a_end = &a[num_bytes];
+	for (; a != a_end; ++a, ++b)
 	{
-		if (*s1 != *s2)
+		if (*a != *b)
 		{
 			return false;
 		}
@@ -99,7 +101,7 @@ static void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 	uint32 num_entries;
 
 	DWORD num_bytes_read;
-	bool success = ReadFile(file, &file_sig, sizeof(file_sig), &num_bytes_read, /*lpOverlapped*/ nullptr);
+	bool success = ReadFile(file, &file_sig, sizeof(file_sig), &num_bytes_read, /*lpOverlapped*/ nullptr); // todo(jbr) compress and tidy up
 	assert(success);
 	assert(file_sig == c_pigg_file_sig);
 	success = ReadFile(file, &unknown, sizeof(unknown), &num_bytes_read, /*lpOverlapped*/ nullptr);
@@ -332,28 +334,65 @@ static void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 	CloseHandle(file);
 }
 
-static bool file_read_u32(HANDLE file, uint32* u32)
+static void file_read_bytes(HANDLE file, uint32 num_bytes, void* dst)
 {
 	DWORD num_bytes_read;
-	return ReadFile(file, u32, sizeof(*u32), &num_bytes_read, /*lpOverlapped*/ nullptr);
+	bool success = ReadFile(file, dst, num_bytes, &num_bytes_read, /*lpOverlapped*/ nullptr);
+	assert(success);
 }
 
-static bool file_read_u16(HANDLE file, uint16* u16)
+static uint32 file_read_u32(HANDLE file)
 {
-	DWORD num_bytes_read;
-	return ReadFile(file, u16, sizeof(*u16), &num_bytes_read, /*lpOverlapped*/ nullptr);
+	uint32 u32;
+	file_read_bytes(file, sizeof(u32), &u32);
+	return u32;
 }
 
-static bool file_read_bytes(HANDLE file, uint8* bytes, uint32 num)
+static uint16 file_read_u16(HANDLE file)
 {
-	DWORD num_bytes_read;
-	return ReadFile(file, bytes, num, &num_bytes_read, /*lpOverlapped*/ nullptr);
+	uint16 u16;
+	file_read_bytes(file, sizeof(u16), &u16);
+	return u16;
 }
 
-static bool file_skip(HANDLE file, uint32 num)
+static float32 file_read_f32(HANDLE file)
 {
-	DWORD result = SetFilePointer(file, num, /*PLONG lpDistanceToMoveHigh*/ nullptr, FILE_CURRENT);
-	return result != INVALID_SET_FILE_POINTER;
+	float32 f32;
+	file_read_bytes(file, sizeof(f32), &f32);
+	return f32;
+}
+
+static void file_skip(HANDLE file, uint32 num_bytes)
+{
+	DWORD result = SetFilePointer(file, num_bytes, /*PLONG lpDistanceToMoveHigh*/ nullptr, FILE_CURRENT);
+	assert(result != INVALID_SET_FILE_POINTER);
+}
+
+static uint32 file_get_position(HANDLE file)
+{
+	DWORD result = SetFilePointer(file, 0, /*PLONG lpDistanceToMoveHigh*/ nullptr, FILE_CURRENT);
+	assert(result != INVALID_SET_FILE_POINTER);
+	return result;
+}
+
+static void file_set_position(HANDLE file, uint32 position)
+{
+	DWORD result = SetFilePointer(file, position, /*PLONG lpDistanceToMoveHigh*/ nullptr, FILE_BEGIN);
+	assert(result != INVALID_SET_FILE_POINTER);
+}
+
+static void bin_file_read_string(HANDLE file, char* dst) // todo(jbr) protect against buffer overrun
+{
+	uint16 string_length = file_read_u16(file);
+	file_read_bytes(file, string_length, dst);
+	dst[string_length] = 0;
+
+	// note: bin files need 4 byte aligned reads
+	uint32 bytes_misaligned = (string_length + 2) & 3; // equivalent to % 4
+	if (bytes_misaligned)
+	{
+		file_skip(file, 4 - bytes_misaligned);
+	}
 }
 
 
@@ -389,7 +428,8 @@ int main(int argc, const char** argv)
 			allocator.bytes_available = c_memory_size;
 
 			unpack_pigg_file(path_buffer, &allocator);
-		} while (FindNextFileA(find_handle, &find_data));
+		} 
+		while (FindNextFileA(find_handle, &find_data));
 
 		FindClose(find_handle);
 	}
@@ -398,86 +438,76 @@ int main(int argc, const char** argv)
 	{
 		HANDLE bin_file = CreateFileA(argv[1], GENERIC_READ, FILE_SHARE_READ, /*lpSecurityAttributes*/ nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile*/ nullptr);
 		assert(bin_file != INVALID_HANDLE_VALUE);
+		
+		uint8 sig[8];
+		file_read_bytes(bin_file, 8, sig);
+		assert(bytes_equal(sig, c_bin_file_sig, 8));
 
-		char sig[8];
-		bool success = file_read_bytes(bin_file, (uint8*)sig, 8);
-		assert(success);
-		assert(string_equals(sig, "CrypticS", 8)); // todo(jbr) put this in a constant
-
-		/* self.fmt = self.read_struct("<L", 4)[0]
-
-		s1 = self.read_string()
-		s2 = self.read_string()
-
-		flsiz = self.read_struct("<L", 4)[0]
-		pos = self.tell()
-
-		# read file list
-		flnum = self.read_struct("<L", 4)[0]
-		for n in range(0, flnum):
-		  s = self.read_string()
-		  x = self.read_struct("<L", 4)[0]
-		  self.files.append(DirEntry(s, x))
-
-		pos += flsiz
-		self.seek(pos)
-
-		self.datasize = self.read_struct("<L", 4)[0]
-
-		if self.fmt in decoders:
-		  self.decoder = decoders.get(self.fmt)
-		else:
-		  print "Unknown format %s, using fallback decoder" % hex(self.fmt)
-		  self.decoder = DefaultDecoder() */
-
-
-		  /*
-		  slen = self.read_struct("<H", 2)[0]
-		  # .bin files need dword-aligned reads
-		  alen = slen + 2
-		  part = alen & 3
-		  if part != 0:
-			alen += 4 - part
-		  data = self.f.read(alen - 2)
-		  return data[:slen]
-		  */
-
-		uint32 format;
-		success = file_read_u32(bin_file, &format);
-		assert(success);
-
-		uint16 string_length;
-		success = file_read_u16(bin_file, &string_length);
-		assert(success);
+		uint32 bin_type_id = file_read_u32(bin_file);
 
 		char buffer[512];
-		success = file_read_bytes(bin_file, (uint8*)buffer, string_length);
-		assert(success);
+		bin_file_read_string(bin_file, buffer); // should be "Parse6" todo(jbr) do something with this?
+		bin_file_read_string(bin_file, buffer); // should be "Files1" todo(jbr) check this?
 
-		// note: bin files need 4 byte aligned reads
-		uint32 bytes_misaligned = (string_length + 1) & 3; // equivalent to % 4
-		if (bytes_misaligned)
+		uint32 files_section_size = file_read_u32(bin_file);
+
+		uint32 num_files = file_read_u32(bin_file);
+
+		for (uint32 i = 0; i < num_files; ++i)
 		{
-			success = file_skip(bin_file, 4 - bytes_misaligned);
-			assert(success);
+			bin_file_read_string(bin_file, buffer);		// file name
+			uint32 timestamp = file_read_u32(bin_file);	// timestamp
 		}
 
-		string_length;
-		success = file_read_u16(bin_file, &string_length);
-		assert(success);
+		uint32 bytes_to_read = file_read_u32(bin_file);
 
-		success = file_read_bytes(bin_file, (uint8*)buffer, string_length);
-		assert(success);
+		uint32 version = file_read_u32(bin_file);
+		bin_file_read_string(bin_file, buffer); // scene file
+		
+		// should be loading screen here according to schema?
 
-		// note: bin files need 4 byte aligned reads
-		bytes_misaligned = (string_length + 1) & 3; // equivalent to % 4
-		if (bytes_misaligned)
+		printf("(fpos=%d)\n", file_get_position(bin_file));
+		uint32 u_1 = file_read_u32(bin_file);
+		printf("(fpos=%d)\n", file_get_position(bin_file));
+		uint32 u_2 = file_read_u32(bin_file);
+
+		while (true)
 		{
-			success = file_skip(bin_file, 4 - bytes_misaligned);
-			assert(success);
+			printf("(fpos=%d)\n", file_get_position(bin_file));
+
+			uint32 size = file_read_u32(bin_file);
+			uint32 group_beginning = file_get_position(bin_file);
+
+			bin_file_read_string(bin_file, buffer); // group name
+			printf("%s\n", buffer);
+
+			uint32 n = file_read_u32(bin_file);
+			printf("%d items\n", n);
+
+			for (uint32 i = 0; i < n; ++i)
+			{
+				printf("(fpos=%d)\n", file_get_position(bin_file));
+				uint32 type = file_read_u32(bin_file);
+				assert(type == 0x6c || type == 116 || type == 36 || type == 104); // not sure what this is.. struct type? group id?
+
+				bin_file_read_string(bin_file, buffer); // name
+				float32 x, y, z;
+				x = file_read_f32(bin_file);
+				y = file_read_f32(bin_file);
+				z = file_read_f32(bin_file);
+				float32 d1, d2, d3, flags;
+				d1 = file_read_f32(bin_file);
+				d2 = file_read_f32(bin_file);
+				d3 = file_read_f32(bin_file);
+				flags = file_read_u32(bin_file);
+
+				printf("%s (%f, %f, %f) (%f, %f, %f) %d\n", buffer, x, y, z, d1, d2, d3, flags);
+			}
+
+			file_set_position(bin_file, group_beginning + size);
 		}
+		
 	}
-
 
 	return 0;
 }
