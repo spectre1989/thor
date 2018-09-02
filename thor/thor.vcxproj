@@ -147,7 +147,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="thor.cpp" />
+    <ClCompile Include="Bin_File.cpp" />
+    <ClCompile Include="File.cpp" />
+    <ClCompile Include="Memory.cpp" />
+    <ClCompile Include="Pigg_File.cpp" />
+    <ClCompile Include="String.cpp" />
+    <ClCompile Include="Thor.cpp" />
     <ClCompile Include="zlib\adler32.c" />
     <ClCompile Include="zlib\crc32.c" />
     <ClCompile Include="zlib\inffast.c" />
@@ -156,6 +161,12 @@
     <ClCompile Include="zlib\zutil.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Bin_File.h" />
+    <ClInclude Include="File.h" />
+    <ClInclude Include="Memory.h" />
+    <ClInclude Include="Pigg_File.h" />
+    <ClInclude Include="Core.h" />
+    <ClInclude Include="String.h" />
     <ClInclude Include="zlib\crc32.h" />
     <ClInclude Include="zlib\gzguts.h" />
     <ClInclude Include="zlib\inffast.h" />
