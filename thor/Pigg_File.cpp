@@ -35,11 +35,11 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 	assert(header_size == 16);
 	uint16 used_header_bytes = file_read_u16(file);
 	assert(used_header_bytes == 48);
-	uint32 num_entries = file_read_u32(file);
+	uint32 entry_count = file_read_u32(file);
 
-	Pigg_Entry* entries = (Pigg_Entry*)linear_allocator_alloc(allocator, sizeof(Pigg_Entry) * num_entries);
+	Pigg_Entry* entries = (Pigg_Entry*)linear_allocator_alloc(allocator, sizeof(Pigg_Entry) * entry_count);
 
-	for (uint32 i = 0; i < num_entries; ++i)
+	for (uint32 i = 0; i < entry_count; ++i)
 	{
 		Pigg_Entry* entry = &entries[i];
 
@@ -57,15 +57,15 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 	uint32 string_table_sig = file_read_u32(file);
 	assert(string_table_sig == c_string_table_sig);
-	uint32 num_strings = file_read_u32(file);
+	uint32 string_count = file_read_u32(file);
 	uint32 table_size = file_read_u32(file);
 
-	char** strings = (char**)linear_allocator_alloc(allocator, sizeof(char *) * num_strings);
-	uint32 string_data_size = table_size - (num_strings * 4);
+	char** strings = (char**)linear_allocator_alloc(allocator, sizeof(char *) * string_count);
+	uint32 string_data_size = table_size - (string_count * 4);
 	char* string_data = (char*)linear_allocator_alloc(allocator, sizeof(char) * string_data_size);
 	uint32 num_table_bytes_read = 0;
 
-	for (uint32 i = 0; i < num_strings; ++i)
+	for (uint32 i = 0; i < string_count; ++i)
 	{
 		uint32 string_length = file_read_u32(file);
 		assert(string_length <= (string_data_size - num_table_bytes_read));
@@ -80,16 +80,16 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 	// not sure what this does
 	uint32 slot_table_sig = file_read_u32(file);
 	assert(slot_table_sig == c_slot_table_sig);
-	uint32 num_slots = file_read_u32(file);
+	uint32 slot_count = file_read_u32(file);
 	table_size = file_read_u32(file);
 
-	uint8** packed_meta = (uint8**)linear_allocator_alloc(allocator, sizeof(uint8*) * num_slots);
-	uint32* packed_meta_size = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * num_slots); // todo(jbr) lots of this needs renaming and compressing
-	uint32 total_packed_meta_size = table_size - (num_slots * 4);
+	uint8** packed_meta = (uint8**)linear_allocator_alloc(allocator, sizeof(uint8*) * slot_count);
+	uint32* packed_meta_size = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * slot_count); // todo(jbr) lots of this needs renaming and compressing
+	uint32 total_packed_meta_size = table_size - (slot_count * 4);
 	uint8* packed_meta_data = (uint8*)linear_allocator_alloc(allocator, sizeof(uint8) * total_packed_meta_size);
 	num_table_bytes_read = 0;
 
-	for (uint32 i = 0; i < num_slots; ++i)
+	for (uint32 i = 0; i < slot_count; ++i)
 	{
 		packed_meta_size[i] = file_read_u32(file);
 		assert(packed_meta_size[i] <= (total_packed_meta_size - num_table_bytes_read));
@@ -106,7 +106,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 	uint8* in_buffer = (uint8*)linear_allocator_alloc(allocator, sizeof(uint8) * c_in_buffer_size);
 	uint8* out_buffer = (uint8*)linear_allocator_alloc(allocator, sizeof(uint8) * c_out_buffer_size);
-	for (uint32 i = 0; i < num_entries; ++i)
+	for (uint32 i = 0; i < entry_count; ++i)
 	{
 		Pigg_Entry* entry = &entries[i];
 
@@ -143,7 +143,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 			(void)inflateEnd(&zlib_stream);
 		}
 
-		assert(entry->string_id < num_strings);
+		assert(entry->string_id < string_count);
 
 		char path_buffer[MAX_PATH + 1];
 		uint32 path_buffer_strlen = string_concat("unpacked/", strings[entry->string_id], path_buffer);
