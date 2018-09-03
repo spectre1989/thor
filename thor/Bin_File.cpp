@@ -9,7 +9,7 @@
 
 void bin_file_check_geobin(HANDLE file);
 void bin_file_check_origins(HANDLE file);
-void bin_file_read_string(HANDLE file, char* dst); // todo(jbr) protect against buffer overrun
+void bin_file_read_string(HANDLE file, uint32 dst_size, char* dst);
 uint32 bin_file_read_color(HANDLE file);
 
 void bin_file_check(HANDLE file)
@@ -25,9 +25,9 @@ void bin_file_check(HANDLE file)
 
 	// todo(jbr) is this the right place to read the file section? depends if the specific file loaders below will need the file list
 	char buffer[MAX_PATH + 1];
-	bin_file_read_string(file, buffer);
+	bin_file_read_string(file, sizeof(buffer), buffer);
 	assert(string_equals(buffer, "Parse6"));
-	bin_file_read_string(file, buffer);
+	bin_file_read_string(file, sizeof(buffer), buffer);
 	assert(string_equals(buffer, "Files1"));
 
 	uint32 files_section_size = file_read_u32(file);
@@ -36,8 +36,8 @@ void bin_file_check(HANDLE file)
 
 	for (uint32 i = 0; i < file_count; ++i)
 	{
-		bin_file_read_string(file, buffer);		// file name
-		uint32 timestamp = file_read_u32(file);	// timestamp
+		bin_file_read_string(file, sizeof(buffer), buffer);	// file name
+		uint32 timestamp = file_read_u32(file);				// timestamp
 	}
 
 	uint32 bytes_to_read = file_read_u32(file);
@@ -62,15 +62,15 @@ void bin_file_check_geobin(HANDLE file)
 {
 	uint32 version = file_read_u32(file);
 	char buffer[512];
-	bin_file_read_string(file, buffer); // scene file
-	bin_file_read_string(file, buffer); // loading screen
+	bin_file_read_string(file, sizeof(buffer), buffer); // scene file
+	bin_file_read_string(file, sizeof(buffer), buffer); // loading screen
 
 	uint32 def_count = file_read_u32(file);
 	for (uint32 def_i = 0; def_i < def_count; ++def_i)
 	{
 		uint32 def_size = file_read_u32(file);
 
-		bin_file_read_string(file, buffer); // name
+		bin_file_read_string(file, sizeof(buffer), buffer); // name
 
 		uint32 group_count = file_read_u32(file);
 		for (uint32 group_i = 0; group_i < group_count; ++group_i)
@@ -78,7 +78,7 @@ void bin_file_check_geobin(HANDLE file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			bin_file_read_string(file, buffer); // name
+			bin_file_read_string(file, sizeof(buffer), buffer); // name
 			Vec3 pos = file_read_vec3(file);
 			Vec3 rot = file_read_vec3(file);
 			uint32 flags = file_read_u32(file);
@@ -92,8 +92,8 @@ void bin_file_check_geobin(HANDLE file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			bin_file_read_string(file, buffer); // todo(jbr) what are these?
-			bin_file_read_string(file, buffer);
+			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
+			bin_file_read_string(file, sizeof(buffer), buffer);
 			uint32 u32 = file_read_u32(file);
 
 			assert((file_get_position(file) - start) == size);
@@ -168,7 +168,7 @@ void bin_file_check_geobin(HANDLE file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			bin_file_read_string(file, buffer); // todo(jbr) what are these?
+			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
 			float32 f_1 = file_read_f32(file);
 			float32 f_2 = file_read_f32(file);
 			float32 f_3 = file_read_f32(file);
@@ -184,7 +184,7 @@ void bin_file_check_geobin(HANDLE file)
 			uint32 start = file_get_position(file);
 
 			uint32 u32 = file_read_u32(file);
-			bin_file_read_string(file, buffer);
+			bin_file_read_string(file, sizeof(buffer), buffer);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -195,7 +195,7 @@ void bin_file_check_geobin(HANDLE file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			bin_file_read_string(file, buffer); // name
+			bin_file_read_string(file, sizeof(buffer), buffer); // name
 			float32 f32 = file_read_f32(file); // todo(jbr) what is this?
 
 			assert((file_get_position(file) - start) == size);
@@ -231,10 +231,10 @@ void bin_file_check_geobin(HANDLE file)
 			assert((file_get_position(file) - start) == size);
 		}
 
-		bin_file_read_string(file, buffer); // "Type"
+		bin_file_read_string(file, sizeof(buffer), buffer); // "Type"
 		uint32 flags = file_read_u32(file);
 		float32 alpha = file_read_f32(file);
-		bin_file_read_string(file, buffer); // "Obj"
+		bin_file_read_string(file, sizeof(buffer), buffer); // "Obj"
 
 		uint32 tex_swap_count = file_read_u32(file);
 		for (uint32 tex_swap_i = 0; tex_swap_i < tex_swap_count; ++tex_swap_i)
@@ -242,14 +242,14 @@ void bin_file_check_geobin(HANDLE file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			bin_file_read_string(file, buffer); // todo(jbr) what are these?
-			bin_file_read_string(file, buffer);
+			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
+			bin_file_read_string(file, sizeof(buffer), buffer);
 			uint32 u32 = file_read_u32(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
 
-		bin_file_read_string(file, buffer); // "SoundScript"
+		bin_file_read_string(file, sizeof(buffer), buffer); // "SoundScript"
 	}
 
 	uint32 ref_count = file_read_u32(file);
@@ -258,7 +258,7 @@ void bin_file_check_geobin(HANDLE file)
 		uint32 size = file_read_u32(file);
 		uint32 start = file_get_position(file);
 
-		bin_file_read_string(file, buffer); // name
+		bin_file_read_string(file, sizeof(buffer), buffer); // name
 		Vec3 pos = file_read_vec3(file);
 		Vec3 rot = file_read_vec3(file);
 
@@ -269,7 +269,7 @@ void bin_file_check_geobin(HANDLE file)
 	uint32 import_count = file_read_u32(file);
 	for (uint32 import_i = 0; import_i < import_count; ++import_i)
 	{
-		bin_file_read_string(file, buffer);
+		bin_file_read_string(file, sizeof(buffer), buffer);
 	}
 }
 
@@ -284,19 +284,21 @@ void bin_file_check_origins(HANDLE file)
 		uint32 size = file_read_u32(file);
 		uint32 start = file_get_position(file);
 
-		bin_file_read_string(file, buffer); // name
-		bin_file_read_string(file, buffer); // display name
-		bin_file_read_string(file, buffer); // display help
-		bin_file_read_string(file, buffer); // display short help
-		bin_file_read_string(file, buffer); // icon
+		bin_file_read_string(file, sizeof(buffer), buffer); // name
+		bin_file_read_string(file, sizeof(buffer), buffer); // display name
+		bin_file_read_string(file, sizeof(buffer), buffer); // display help
+		bin_file_read_string(file, sizeof(buffer), buffer); // display short help
+		bin_file_read_string(file, sizeof(buffer), buffer); // icon
 
 		assert((file_get_position(file) - start) == size);
 	}
 }
 
-void bin_file_read_string(HANDLE file, char* dst) // todo(jbr) protect against buffer overrun
+void bin_file_read_string(HANDLE file, uint32 dst_size, char* dst) // todo(jbr) protect against buffer overrun
 {
 	uint16 string_length = file_read_u16(file);
+	assert(string_length < dst_size);
+
 	file_read_bytes(file, string_length, dst);
 	dst[string_length] = 0;
 
