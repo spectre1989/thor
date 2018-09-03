@@ -16,7 +16,7 @@ struct Pigg_Entry
 	uint32 timestamp;
 	uint32 offset;
 	uint32 unknown;
-	uint32 slot_id;
+	uint32 meta_id;
 	uint8 md5[16];
 	uint32 compressed_size;
 };
@@ -50,7 +50,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		entry->timestamp = file_read_u32(file);
 		entry->offset = file_read_u32(file);
 		entry->unknown = file_read_u32(file);
-		entry->slot_id = file_read_u32(file);
+		entry->meta_id = file_read_u32(file);
 		file_read_bytes(file, 16, entry->md5);
 		entry->compressed_size = file_read_u32(file);
 	}
@@ -78,18 +78,18 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 	}
 
 	// not sure what this does
-	uint32 slot_table_sig = file_read_u32(file);
-	assert(slot_table_sig == c_slot_table_sig);
-	uint32 slot_count = file_read_u32(file);
+	uint32 meta_table_sig = file_read_u32(file);
+	assert(meta_table_sig == c_meta_table_sig);
+	uint32 meta_count = file_read_u32(file);
 	table_size = file_read_u32(file);
 
-	uint8** packed_meta = (uint8**)linear_allocator_alloc(allocator, sizeof(uint8*) * slot_count);
-	uint32* packed_meta_size = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * slot_count); // todo(jbr) lots of this needs renaming and compressing
-	uint32 total_packed_meta_size = table_size - (slot_count * 4);
+	uint8** packed_meta = (uint8**)linear_allocator_alloc(allocator, sizeof(uint8*) * meta_count); // todo(jbr) should these two tables be read in a generic way?
+	uint32* packed_meta_size = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * meta_count);
+	uint32 total_packed_meta_size = table_size - (meta_count * 4);
 	uint8* packed_meta_data = (uint8*)linear_allocator_alloc(allocator, sizeof(uint8) * total_packed_meta_size);
 	num_table_bytes_read = 0;
 
-	for (uint32 i = 0; i < slot_count; ++i)
+	for (uint32 i = 0; i < meta_count; ++i)
 	{
 		packed_meta_size[i] = file_read_u32(file);
 		assert(packed_meta_size[i] <= (total_packed_meta_size - num_table_bytes_read));
@@ -168,14 +168,14 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		assert(success);
 		CloseHandle(out_file);
 
-		if (entry->slot_id != c_invalid_id)
+		if (entry->meta_id != c_invalid_id)
 		{
 			string_copy(".meta", &path_buffer[path_buffer_strlen]);
 
 			out_file = CreateFileA(path_buffer, GENERIC_WRITE, FILE_SHARE_WRITE, /*lpSecurityAttributes*/ nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile*/ nullptr);
 
-			uint8* meta = packed_meta[entry->slot_id];
-			uint32 meta_size = packed_meta_size[entry->slot_id];
+			uint8* meta = packed_meta[entry->meta_id];
+			uint32 meta_size = packed_meta_size[entry->meta_id];
 
 			uint32* meta_file_size = (uint32*)meta;
 			if (*meta_file_size == meta_size)
