@@ -239,6 +239,26 @@ void bin_file_check_geobin(HANDLE file)
 
 		bin_file_read_string(file, buffer); // "SoundScript"
 	}
+
+	uint32 ref_count = file_read_u32(file);
+	for (uint32 ref_i = 0; ref_i < ref_count; ++ref_i)
+	{
+		uint32 size = file_read_u32(file);
+		uint32 start = file_get_position(file);
+
+		bin_file_read_string(file, buffer); // name
+		Vec3 pos = file_read_vec3(file);
+		Vec3 rot = file_read_vec3(file);
+
+		assert((file_get_position(file) - start) == size);
+	}
+
+	// this is in the schema, but no files seem to use it
+	uint32 import_count = file_read_u32(file);
+	for (uint32 import_i = 0; import_i < import_count; ++import_i)
+	{
+		bin_file_read_string(file, buffer);
+	}
 }
 
 void bin_file_read_string(HANDLE file, char* dst) // todo(jbr) protect against buffer overrun
