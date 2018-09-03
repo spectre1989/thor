@@ -7,6 +7,11 @@
 
 
 
+void bin_file_check_geobin(HANDLE file);
+void bin_file_check_origins(HANDLE file);
+void bin_file_read_string(HANDLE file, char* dst); // todo(jbr) protect against buffer overrun
+uint32 bin_file_read_color(HANDLE file);
+
 void bin_file_check(HANDLE file)
 {
 	uint8 sig[8];
@@ -17,24 +22,12 @@ void bin_file_check(HANDLE file)
 	}
 
 	uint32 bin_type_id = file_read_u32(file);
-	switch (bin_type_id)
-	{
-	case c_bin_geobin_type_id:
-		bin_file_check_geobin(file);
-		break;
 
-	default:
-		printf("unsupported bin type id %u\n", bin_type_id);
-		break;
-	}
-}
-
-void bin_file_check_geobin(HANDLE file)
-{
-	char buffer[512];
-	bin_file_read_string(file, buffer); // should be "Parse6" todo(jbr) do something with this?
+	// todo(jbr) is this the right place to read the file section? depends if the specific file loaders below will need the file list
+	char buffer[MAX_PATH + 1];
+	bin_file_read_string(file, buffer);
 	assert(string_equals(buffer, "Parse6"));
-	bin_file_read_string(file, buffer); // should be "Files1" todo(jbr) check this?
+	bin_file_read_string(file, buffer);
 	assert(string_equals(buffer, "Files1"));
 
 	uint32 files_section_size = file_read_u32(file);
@@ -49,7 +42,26 @@ void bin_file_check_geobin(HANDLE file)
 
 	uint32 bytes_to_read = file_read_u32(file);
 
+	switch (bin_type_id)
+	{
+	case c_bin_geobin_type_id:
+		bin_file_check_geobin(file);
+		break;
+
+	case c_bin_origins_type_id:
+		bin_file_check_origins(file);
+		break;
+
+	default:
+		printf("unsupported bin type id %u\n", bin_type_id);
+		break;
+	}
+}
+
+void bin_file_check_geobin(HANDLE file)
+{
 	uint32 version = file_read_u32(file);
+	char buffer[512];
 	bin_file_read_string(file, buffer); // scene file
 	bin_file_read_string(file, buffer); // loading screen
 
@@ -258,6 +270,27 @@ void bin_file_check_geobin(HANDLE file)
 	for (uint32 import_i = 0; import_i < import_count; ++import_i)
 	{
 		bin_file_read_string(file, buffer);
+	}
+}
+
+void bin_file_check_origins(HANDLE file)
+{
+	uint32 p = file_get_position(file);
+	char buffer[512];
+
+	uint32 origin_count = file_read_u32(file);
+	for (uint32 origin_i = 0; origin_i < origin_count; ++origin_i)
+	{
+		uint32 size = file_read_u32(file);
+		uint32 start = file_get_position(file);
+
+		bin_file_read_string(file, buffer); // name
+		bin_file_read_string(file, buffer); // display name
+		bin_file_read_string(file, buffer); // display help
+		bin_file_read_string(file, buffer); // display short help
+		bin_file_read_string(file, buffer); // icon
+
+		assert((file_get_position(file) - start) == size);
 	}
 }
 
