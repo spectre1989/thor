@@ -273,7 +273,6 @@ void bin_file_check_geobin(HANDLE file)
 
 void bin_file_check_origins(HANDLE file)
 {
-	uint32 p = file_get_position(file);
 	char buffer[512];
 
 	uint32 origin_count = file_read_u32(file);
