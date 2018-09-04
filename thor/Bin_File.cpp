@@ -23,17 +23,15 @@ void bin_file_check(HANDLE file)
 
 	uint32 bin_type_id = file_read_u32(file);
 
-	// todo(jbr) is this the right place to read the file section? depends if the specific file loaders below will need the file list
 	char buffer[MAX_PATH + 1];
 	bin_file_read_string(file, sizeof(buffer), buffer);
 	assert(string_equals(buffer, "Parse6"));
 	bin_file_read_string(file, sizeof(buffer), buffer);
 	assert(string_equals(buffer, "Files1"));
 
+	// These files are a list of text files used to create this bin (not useful)
 	uint32 files_section_size = file_read_u32(file);
-
 	uint32 file_count = file_read_u32(file);
-
 	for (uint32 i = 0; i < file_count; ++i)
 	{
 		bin_file_read_string(file, sizeof(buffer), buffer);	// file name
