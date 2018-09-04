@@ -307,13 +307,17 @@ void bin_file_check_bounds(HANDLE file)
 		uint32 start = file_get_position(file);
 
 		bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
-		Vec3 v_1 = file_read_vec3(file); // min
-		Vec3 v_2 = file_read_vec3(file); // max
-		float32 f_1 = file_read_f32(file); // todo(jbr) calculate width/height/depth/radius/etc and see if that matches any of the fields in v3/4
+		Vec3 min = file_read_vec3(file); // min
+		Vec3 max = file_read_vec3(file); // max
+		Vec3 v_3 = file_read_vec3(file);
+		float f_1 = file_read_f32(file);
+		float radius = file_read_f32(file); // radius of a sphere which contains the cube
+		float f_2 = file_read_f32(file);
 		uint32 u_1 = file_read_u32(file);
 		uint32 u_2 = file_read_u32(file);
-		Vec3 v_3 = file_read_vec3(file);
-		Vec3 v_4 = file_read_vec3(file);
+		uint32 flags = file_read_u32(file);
+		// 0x2000000 visible only to developers
+		// 0x800000 no collision
 
 		assert((file_get_position(file) - start) == size);
 	}
