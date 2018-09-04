@@ -1,7 +1,7 @@
 #pragma once
 
-#include <Windows.h>
 #include "Core.h"
+#include "File.h"
 
 
 
@@ -14,4 +14,6 @@ constexpr uint32 c_bin_origins_type_id = 0x6d177c17;
 /**
  * check a bin file can be successfully parsed
  */
-void bin_file_check(HANDLE file);
+void bin_file_check(File_Handle file);
+
+void do_thing(File_Handle file);

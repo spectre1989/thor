@@ -4,16 +4,17 @@
 #include "File.h"
 #include "Memory.h"
 #include "String.h"
+#include "Zlib.h"
 
 
 
-void bin_file_check_geobin(HANDLE file);
-void bin_file_check_bounds(HANDLE file);
-void bin_file_check_origins(HANDLE file);
-void bin_file_read_string(HANDLE file, uint32 dst_size, char* dst);
-uint32 bin_file_read_color(HANDLE file);
+void bin_file_check_geobin(File_Handle file);
+void bin_file_check_bounds(File_Handle file);
+void bin_file_check_origins(File_Handle file);
+void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst);
+uint32 bin_file_read_color(File_Handle file);
 
-void bin_file_check(HANDLE file)
+void bin_file_check(File_Handle file)
 {
 	uint8 sig[8];
 	file_read_bytes(file, 8, sig);
@@ -24,7 +25,7 @@ void bin_file_check(HANDLE file)
 
 	uint32 bin_type_id = file_read_u32(file);
 
-	char buffer[MAX_PATH + 1];
+	char buffer[512];
 	bin_file_read_string(file, sizeof(buffer), buffer);
 	assert(string_equals(buffer, "Parse6"));
 	bin_file_read_string(file, sizeof(buffer), buffer);
@@ -61,7 +62,7 @@ void bin_file_check(HANDLE file)
 	}
 }
 
-void bin_file_check_geobin(HANDLE file)
+void bin_file_check_geobin(File_Handle file)
 {
 	uint32 version = file_read_u32(file);
 	char buffer[512];
@@ -276,7 +277,7 @@ void bin_file_check_geobin(HANDLE file)
 	}
 }
 
-void bin_file_check_origins(HANDLE file)
+void bin_file_check_origins(File_Handle file)
 {
 	char buffer[512];
 
@@ -296,7 +297,7 @@ void bin_file_check_origins(HANDLE file)
 	}
 }
 
-void bin_file_check_bounds(HANDLE file)
+void bin_file_check_bounds(File_Handle file)
 {
 	char buffer[512];
 
@@ -323,7 +324,7 @@ void bin_file_check_bounds(HANDLE file)
 	}
 }
 
-void bin_file_read_string(HANDLE file, uint32 dst_size, char* dst) // todo(jbr) protect against buffer overrun
+void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst) // todo(jbr) protect against buffer overrun
 {
 	uint16 string_length = file_read_u16(file);
 	assert(string_length < dst_size);
@@ -339,7 +340,7 @@ void bin_file_read_string(HANDLE file, uint32 dst_size, char* dst) // todo(jbr) 
 	}
 }
 
-uint32 bin_file_read_color(HANDLE file)
+uint32 bin_file_read_color(File_Handle file)
 {
 	// for some reason the 3 components are written as 3 individual uint32s
 	uint32 r = file_read_u32(file);

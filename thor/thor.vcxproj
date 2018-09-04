@@ -154,6 +154,7 @@
     <ClCompile Include="Pigg_File.cpp" />
     <ClCompile Include="String.cpp" />
     <ClCompile Include="Thor.cpp" />
+    <ClCompile Include="Zlib.cpp" />
     <ClCompile Include="zlib\adler32.c" />
     <ClCompile Include="zlib\crc32.c" />
     <ClCompile Include="zlib\inffast.c" />
@@ -168,6 +169,7 @@
     <ClInclude Include="Pigg_File.h" />
     <ClInclude Include="Core.h" />
     <ClInclude Include="String.h" />
+    <ClInclude Include="Zlib.h" />
     <ClInclude Include="zlib\crc32.h" />
     <ClInclude Include="zlib\gzguts.h" />
     <ClInclude Include="zlib\inffast.h" />

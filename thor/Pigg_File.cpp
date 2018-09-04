@@ -1,10 +1,9 @@
 #include "Pigg_File.h"
 
-#include <Windows.h>
 #include "File.h"
 #include "Memory.h"
 #include "String.h"
-#include "zlib/zlib.h"
+#include "Zlib.h"
 
 
 
@@ -25,8 +24,7 @@ constexpr uint32 c_invalid_id = (uint32)-1; // for string/slot ids
 
 void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 {
-	HANDLE file = CreateFileA(file_name, GENERIC_READ, FILE_SHARE_READ, /*lpSecurityAttributes*/ nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile*/ nullptr);
-	assert(file != INVALID_HANDLE_VALUE);
+	File_Handle file = file_open_read(file_name);
 
 	uint32 file_sig = file_read_u32(file);
 	uint16 unknown = file_read_u16(file);
@@ -113,7 +111,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		assert(entry->compressed_size <= c_in_buffer_size);
 		assert(entry->file_size <= c_out_buffer_size);
 
-		SetFilePointer(file, entry->offset, /*lpDistanceToMoveHigh*/ nullptr, FILE_BEGIN);
+		file_set_position(file, entry->offset);
 
 		if (entry->compressed_size == 0)
 		{
@@ -125,27 +123,12 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 			file_read_bytes(file, entry->compressed_size, in_buffer);
 
-			z_stream zlib_stream;
-			zlib_stream.zalloc = Z_NULL;
-			zlib_stream.zfree = Z_NULL;
-			zlib_stream.opaque = Z_NULL;
-			zlib_stream.avail_in = 0;
-			zlib_stream.next_in = Z_NULL;
-			int zlib_result = inflateInit(&zlib_stream);
-			assert(zlib_result == Z_OK);
-
-			zlib_stream.next_in = in_buffer;
-			zlib_stream.avail_in = entry->compressed_size;
-			zlib_stream.next_out = out_buffer;
-			zlib_stream.avail_out = entry->file_size;
-			zlib_result = inflate(&zlib_stream, Z_NO_FLUSH);
-			assert(zlib_result == Z_STREAM_END);
-			(void)inflateEnd(&zlib_stream);
+			zlib_inflate_bytes(entry->compressed_size, in_buffer, entry->file_size, out_buffer);
 		}
 
 		assert(entry->string_id < string_count);
 
-		char path_buffer[MAX_PATH + 1];
+		char path_buffer[512];
 		uint32 path_buffer_strlen = string_concat("unpacked/", strings[entry->string_id], path_buffer);
 
 		for (uint32 string_i = 0; path_buffer[string_i]; ++string_i)
@@ -155,24 +138,21 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 				// temporarily terminate string here to create directory, then reinstate it after
 				path_buffer[string_i] = 0;
 
-				bool success = CreateDirectoryA(path_buffer, /*lpSecurityAttributes*/ nullptr);
-				assert(success || GetLastError() == ERROR_ALREADY_EXISTS);
+				dir_create(path_buffer);
 
 				path_buffer[string_i] = '/';
 			}
 		}
 
-		HANDLE out_file = CreateFileA(path_buffer, GENERIC_WRITE, FILE_SHARE_WRITE, /*lpSecurityAttributes*/ nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile*/ nullptr);
-		DWORD num_bytes_written;
-		bool success = WriteFile(out_file, out_buffer, entry->file_size, &num_bytes_written, /*lpOverlapped*/ nullptr);
-		assert(success);
-		CloseHandle(out_file);
+		File_Handle out_file = file_open_write(path_buffer);
+		file_write_bytes(out_file, entry->file_size, out_buffer);
+		file_close(out_file);
 
 		if (entry->meta_id != c_invalid_id)
 		{
 			string_copy(".meta", &path_buffer[path_buffer_strlen]);
 
-			out_file = CreateFileA(path_buffer, GENERIC_WRITE, FILE_SHARE_WRITE, /*lpSecurityAttributes*/ nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile*/ nullptr);
+			out_file = file_open_write(path_buffer);
 
 			uint8* meta = packed_meta[entry->meta_id];
 			uint32 meta_size = packed_meta_size[entry->meta_id];
@@ -181,8 +161,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 			if (*meta_file_size == meta_size)
 			{
 				// not compressed
-				success = WriteFile(out_file, &meta[4], meta_size - 4, &num_bytes_written, /*lpOverlapped*/ nullptr);
-				assert(success);
+				file_write_bytes(out_file, meta_size - 4, &meta[4]);
 			}
 			else
 			{
@@ -192,37 +171,19 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 				if (!(*compressed_size))
 				{
 					// not compressed
-					success = WriteFile(out_file, &meta[8], meta_size - 8, &num_bytes_written, /*lpOverlapped*/ nullptr);
-					assert(success);
+					file_write_bytes(out_file, meta_size - 8, &meta[8]);
 				}
 				else
 				{
-					z_stream zlib_stream;
-					zlib_stream.zalloc = Z_NULL;
-					zlib_stream.zfree = Z_NULL;
-					zlib_stream.opaque = Z_NULL;
-					zlib_stream.avail_in = 0;
-					zlib_stream.next_in = Z_NULL;
-					int zlib_result = inflateInit(&zlib_stream);
-					assert(zlib_result == Z_OK);
+					uint32 bytes_inflated = zlib_inflate_bytes(meta_size - 8, &meta[8], c_out_buffer_size, out_buffer);
 
-					zlib_stream.next_in = &meta[8];
-					zlib_stream.avail_in = meta_size - 8;
-					zlib_stream.next_out = out_buffer;
-					zlib_stream.avail_out = c_out_buffer_size;
-					zlib_result = inflate(&zlib_stream, Z_NO_FLUSH);
-					assert(zlib_result == Z_STREAM_END);
-
-					success = WriteFile(out_file, out_buffer, c_out_buffer_size - zlib_stream.avail_out, &num_bytes_written, /*lpOverlapped*/ nullptr);
-					assert(success);
-
-					(void)inflateEnd(&zlib_stream);
+					file_write_bytes(out_file, bytes_inflated, out_buffer);
 				}
 			}
 
-			CloseHandle(out_file);
+			file_close(out_file);
 		}
 	}
 
-	CloseHandle(file);
+	file_close(file);
 }

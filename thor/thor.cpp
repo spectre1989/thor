@@ -1,5 +1,6 @@
 ﻿#include <Windows.h>
 #include "Bin_File.h"
+#include "File.h"
 #include "Memory.h"
 #include "Pigg_File.h"
 #include "String.h"
