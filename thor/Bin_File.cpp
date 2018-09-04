@@ -8,6 +8,7 @@
 
 
 void bin_file_check_geobin(HANDLE file);
+void bin_file_check_bounds(HANDLE file);
 void bin_file_check_origins(HANDLE file);
 void bin_file_read_string(HANDLE file, uint32 dst_size, char* dst);
 uint32 bin_file_read_color(HANDLE file);
@@ -38,12 +39,16 @@ void bin_file_check(HANDLE file)
 		uint32 timestamp = file_read_u32(file);				// timestamp
 	}
 
-	uint32 bytes_to_read = file_read_u32(file);
+	uint32 data_size = file_read_u32(file);
 
 	switch (bin_type_id)
 	{
 	case c_bin_geobin_type_id:
 		bin_file_check_geobin(file);
+		break;
+
+	case c_bin_bounds_type_id:
+		bin_file_check_bounds(file);
 		break;
 
 	case c_bin_origins_type_id:
@@ -286,6 +291,29 @@ void bin_file_check_origins(HANDLE file)
 		bin_file_read_string(file, sizeof(buffer), buffer); // display help
 		bin_file_read_string(file, sizeof(buffer), buffer); // display short help
 		bin_file_read_string(file, sizeof(buffer), buffer); // icon
+
+		assert((file_get_position(file) - start) == size);
+	}
+}
+
+void bin_file_check_bounds(HANDLE file)
+{
+	char buffer[512];
+
+	uint32 bounds_count = file_read_u32(file);
+	for (uint32 bounds_i = 0; bounds_i < bounds_count; ++bounds_i)
+	{
+		uint32 size = file_read_u32(file);
+		uint32 start = file_get_position(file);
+
+		bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
+		Vec3 v_1 = file_read_vec3(file); // min
+		Vec3 v_2 = file_read_vec3(file); // max
+		float32 f_1 = file_read_f32(file); // todo(jbr) calculate width/height/depth/radius/etc and see if that matches any of the fields in v3/4
+		uint32 u_1 = file_read_u32(file);
+		uint32 u_2 = file_read_u32(file);
+		Vec3 v_3 = file_read_vec3(file);
+		Vec3 v_4 = file_read_vec3(file);
 
 		assert((file_get_position(file) - start) == size);
 	}
