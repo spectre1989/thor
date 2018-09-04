@@ -1,4 +1,4 @@
-﻿#include <Windows.h>
+﻿#include <Windows.h> // todo(jbr) get rid of this include
 #include "Bin_File.h"
 #include "File.h"
 #include "Memory.h"
@@ -14,8 +14,11 @@ int main(int argc, const char** argv)
 		return 1;
 	}
 
-	bool unpack_piggs = false;
-	bool check_bins = true;
+	bool unpack_piggs = true;
+	bool check_bins = false;
+
+	do_thing(file_open_read(argv[1]));
+	return 0;
 
 	if (unpack_piggs)
 	{

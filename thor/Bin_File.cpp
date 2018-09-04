@@ -350,3 +350,27 @@ uint32 bin_file_read_color(File_Handle file)
 
 	return (r << 16) | (g << 8) | b;
 }
+
+void do_thing(File_Handle file)
+{
+	uint32 deflated_header_size = file_read_u32(file);
+	uint32 u_2 = file_read_u32(file);
+	uint32 u_3 = file_read_u32(file);
+	uint32 inflated_header_size = file_read_u32(file);
+
+	uint8* deflated = new uint8[deflated_header_size];
+	uint8* inflated = new uint8[inflated_header_size];
+
+	file_read_bytes(file, deflated_header_size, deflated);
+
+	uint32 inflated_bytes = zlib_inflate_bytes(deflated_header_size, deflated, inflated_header_size, inflated);
+
+	File_Handle out_file = file_open_write("out_geo_header.bin");
+	file_write_bytes(out_file, inflated_bytes, inflated);
+	file_close(out_file);
+
+	constexpr uint32 c_in_buffer_size = kilobytes(4096);
+	constexpr uint32 c_out_buffer_size = megabytes(32);
+	deflated = new uint8[c_in_buffer_size];
+	inflated = new uint8[c_out_buffer_size];
+}
