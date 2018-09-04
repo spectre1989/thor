@@ -55,22 +55,18 @@ int main(int argc, const char** argv)
 		allocator.bytes_available = c_memory_size;
 		allocator.memory = memory;
 
-		// todo(jbr) actually don't need the array of folders, could just have an array of directories as strings
+		// the only thing allocated by this allocator are these directory strings, so they just sit back to back in memory
+		char* root_directory = (char*)linear_allocator_alloc(&allocator, string_length(argv[1]) + 1);
+		string_copy(argv[1], root_directory);
 
-		constexpr uint32 c_max_folders = 1024 * 10;
-		char** folders = (char**)linear_allocator_alloc(&allocator, sizeof(char*) * c_max_folders);
-		uint32 folder_count = 0;
+		char* last_found_directory = root_directory;
+		char* current_unsearched_directory = root_directory;
 
-		folders[folder_count] = (char*)linear_allocator_alloc(&allocator, sizeof(char) * (string_length(argv[1]) + 1));
-		string_copy(argv[1], folders[folder_count]);
-		++folder_count;
-
-		uint32 processed_folder_count = 0;
-		while (processed_folder_count < folder_count)
+		while (current_unsearched_directory <= last_found_directory)
 		{
 			char search_path[MAX_PATH + 1];
-			string_concat(folders[processed_folder_count], "/*", search_path);
-			uint32 base_path_length = string_length(folders[processed_folder_count]);
+			string_concat(current_unsearched_directory, "/*", search_path);
+			uint32 current_directory_length = string_length(current_unsearched_directory);
 			WIN32_FIND_DATAA find_data;
 			HANDLE find_handle = FindFirstFileA(search_path, &find_data);
 			assert(find_handle != INVALID_HANDLE_VALUE);
@@ -82,26 +78,26 @@ int main(int argc, const char** argv)
 				{
 					if (!string_equals(find_data.cFileName, ".") && !string_equals(find_data.cFileName, ".."))
 					{
-						folders[folder_count] = (char*)linear_allocator_alloc(&allocator, sizeof(char) * (base_path_length + string_length(find_data.cFileName) + 2)); // + 1 for '/', and + 1 for null terminator
-						string_copy(folders[processed_folder_count], folders[folder_count]);
-						folders[folder_count][base_path_length] = '/';
-						string_copy(find_data.cFileName, &folders[folder_count][base_path_length + 1]);
-						++folder_count;
-						assert(folder_count != c_max_folders);
+						char* new_directory = (char*)linear_allocator_alloc(&allocator, current_directory_length + string_length(find_data.cFileName) + 2); // + 1 for '/', and + 1 for null terminator
+						string_copy(current_unsearched_directory, new_directory);
+						new_directory[current_directory_length] = '/';
+						string_copy(find_data.cFileName, &new_directory[current_directory_length + 1]);
+						last_found_directory = new_directory;
 					}
 				}
 			} while (FindNextFileA(find_handle, &find_data));
 
-			++processed_folder_count;
+			current_unsearched_directory += current_directory_length + 1;
 
 			FindClose(find_handle);
 		}
 
-		for (uint32 folder_i = 0; folder_i < folder_count; ++folder_i)
+		current_unsearched_directory = root_directory;
+		while (current_unsearched_directory <= last_found_directory)
 		{
 			char search_path[MAX_PATH + 1];
-			string_concat(folders[folder_i], "/*", search_path);
-			uint32 base_path_length = string_length(folders[folder_i]);
+			string_concat(current_unsearched_directory, "/*", search_path);
+			uint32 current_directory_length = string_length(current_unsearched_directory);
 			WIN32_FIND_DATAA find_data;
 			HANDLE find_handle = FindFirstFileA(search_path, &find_data);
 			assert(find_handle != INVALID_HANDLE_VALUE);
@@ -112,9 +108,9 @@ int main(int argc, const char** argv)
 				if (!is_directory)
 				{
 					char file_path[MAX_PATH + 1];
-					string_copy(folders[folder_i], file_path);
-					file_path[base_path_length] = '/';
-					string_copy(find_data.cFileName, &file_path[base_path_length + 1]);
+					string_copy(current_unsearched_directory, file_path);
+					file_path[current_directory_length] = '/';
+					string_copy(find_data.cFileName, &file_path[current_directory_length + 1]);
 
 					HANDLE bin_file = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ, /*lpSecurityAttributes*/ nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, /*hTemplateFile*/ nullptr);
 					assert(bin_file != INVALID_HANDLE_VALUE);
@@ -124,6 +120,8 @@ int main(int argc, const char** argv)
 					CloseHandle(bin_file);
 				}
 			} while (FindNextFileA(find_handle, &find_data));
+
+			current_unsearched_directory += current_directory_length + 1;
 
 			FindClose(find_handle);
 		}
