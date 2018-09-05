@@ -354,8 +354,7 @@ uint32 bin_file_read_color(File_Handle file)
 void do_thing(File_Handle file)
 {
 	uint32 deflated_header_size = file_read_u32(file);
-	uint32 u_2 = file_read_u32(file);
-	uint32 u_3 = file_read_u32(file);
+	deflated_header_size -= 4;
 	uint32 inflated_header_size = file_read_u32(file);
 
 	uint8* deflated = new uint8[deflated_header_size];
@@ -363,14 +362,35 @@ void do_thing(File_Handle file)
 
 	file_read_bytes(file, deflated_header_size, deflated);
 
-	uint32 inflated_bytes = zlib_inflate_bytes(deflated_header_size, deflated, inflated_header_size, inflated);
+	uint32 bytes_inflated = zlib_inflate_bytes(deflated_header_size, deflated, inflated_header_size, inflated);
+	assert(bytes_inflated == inflated_header_size);
 
-	File_Handle out_file = file_open_write("out_geo_header.bin");
-	file_write_bytes(out_file, inflated_bytes, inflated);
-	file_close(out_file);
+	uint32* values = (uint32*)inflated;
 
-	constexpr uint32 c_in_buffer_size = kilobytes(4096);
-	constexpr uint32 c_out_buffer_size = megabytes(32);
-	deflated = new uint8[c_in_buffer_size];
-	inflated = new uint8[c_out_buffer_size];
+	// tex block info
+	uint32 geo_data_size = values[0];
+	uint32 texture_name_block_size = values[1];
+	uint32 bone_names_size = values[2];
+	uint32 texture_binds_size = values[3];
+
+	uint8* geo_set_header = inflated + 16 /*tex block info*/ + texture_name_block_size + bone_names_size + texture_binds_size;
+	char name[124];
+	for (uint32 i = 0; i < 124; ++i)
+	{
+		name[i] = geo_set_header[i];
+	}
+	geo_set_header += 124;
+	uint32* uptr = (uint32*)geo_set_header;
+	uint32 parent_index = uptr[0];
+	uint32 u_1 = uptr[1];
+	uint32 subs_index = uptr[2];
+	uint32 num_sub_models = uptr[3];
+
+	uint8* sub_models_start = geo_set_header + 16;
+	for (uint32 sub_model_i = 0; sub_model_i < num_sub_models; ++sub_model_i)
+	{
+
+	}
+
+	int x = 1;
 }

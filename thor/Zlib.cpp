@@ -23,5 +23,7 @@ uint32 zlib_inflate_bytes(uint32 in_bytes_size, uint8* in_bytes, uint32 out_byte
 	assert(zlib_result == Z_STREAM_END);
 	(void)inflateEnd(&zlib_stream);
 
+	assert(zlib_stream.avail_in == 0);
+
 	return out_bytes_size - zlib_stream.avail_out;
 }
