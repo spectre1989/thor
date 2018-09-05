@@ -4,7 +4,6 @@
 #include "File.h"
 #include "Memory.h"
 #include "String.h"
-#include "Zlib.h"
 
 
 
@@ -349,48 +348,4 @@ uint32 bin_file_read_color(File_Handle file)
 	assert((r < 256) && (g < 256) && (b < 256));
 
 	return (r << 16) | (g << 8) | b;
-}
-
-void do_thing(File_Handle file)
-{
-	uint32 deflated_header_size = file_read_u32(file);
-	deflated_header_size -= 4;
-	uint32 inflated_header_size = file_read_u32(file);
-
-	uint8* deflated = new uint8[deflated_header_size];
-	uint8* inflated = new uint8[inflated_header_size];
-
-	file_read_bytes(file, deflated_header_size, deflated);
-
-	uint32 bytes_inflated = zlib_inflate_bytes(deflated_header_size, deflated, inflated_header_size, inflated);
-	assert(bytes_inflated == inflated_header_size);
-
-	uint32* values = (uint32*)inflated;
-
-	// tex block info
-	uint32 geo_data_size = values[0];
-	uint32 texture_name_block_size = values[1];
-	uint32 bone_names_size = values[2];
-	uint32 texture_binds_size = values[3];
-
-	uint8* geo_set_header = inflated + 16 /*tex block info*/ + texture_name_block_size + bone_names_size + texture_binds_size;
-	char name[124];
-	for (uint32 i = 0; i < 124; ++i)
-	{
-		name[i] = geo_set_header[i];
-	}
-	geo_set_header += 124;
-	uint32* uptr = (uint32*)geo_set_header;
-	uint32 parent_index = uptr[0];
-	uint32 u_1 = uptr[1];
-	uint32 subs_index = uptr[2];
-	uint32 num_sub_models = uptr[3];
-
-	uint8* sub_models_start = geo_set_header + 16;
-	for (uint32 sub_model_i = 0; sub_model_i < num_sub_models; ++sub_model_i)
-	{
-
-	}
-
-	int x = 1;
 }

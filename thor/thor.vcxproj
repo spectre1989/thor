@@ -149,7 +149,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Bin_File.cpp" />
+    <ClCompile Include="Buffer.cpp" />
     <ClCompile Include="File.cpp" />
+    <ClCompile Include="Geo_File.cpp" />
     <ClCompile Include="Memory.cpp" />
     <ClCompile Include="Pigg_File.cpp" />
     <ClCompile Include="String.cpp" />
@@ -164,7 +166,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bin_File.h" />
+    <ClInclude Include="Buffer.h" />
     <ClInclude Include="File.h" />
+    <ClInclude Include="Geo_File.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="Pigg_File.h" />
     <ClInclude Include="Core.h" />

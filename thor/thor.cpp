@@ -1,5 +1,6 @@
 ﻿#include <Windows.h> // todo(jbr) get rid of this include
 #include "Bin_File.h"
+#include "Geo_File.h"
 #include "File.h"
 #include "Memory.h"
 #include "Pigg_File.h"
@@ -17,7 +18,7 @@ int main(int argc, const char** argv)
 	bool unpack_piggs = true;
 	bool check_bins = false;
 
-	do_thing(file_open_read(argv[1]));
+	geo_file_check(file_open_read(argv[1]));
 	return 0;
 
 	if (unpack_piggs)
