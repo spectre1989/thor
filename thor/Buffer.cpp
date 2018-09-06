@@ -83,8 +83,18 @@ void buffer_read_string(uint8** inout_buffer, uint32 dst_size /*incl null*/, cha
 	uint8* buffer = *inout_buffer;
 
 	uint32 dst_bytes_remaining = dst_size;
-	while (dst_bytes_remaining > 1 && *buffer)
+	while (*buffer)
 	{
+		assert(dst_bytes_remaining > 1);
+		if (dst_bytes_remaining == 1)
+		{
+			while (*buffer)
+			{
+				++buffer;
+			}
+			break;
+		}
+
 		*dst = *buffer;
 		++dst;
 		++buffer;
