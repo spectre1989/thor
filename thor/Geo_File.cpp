@@ -29,6 +29,7 @@ void geo_file_check(File_Handle file)
 	uint8* inflated = new uint8[inflated_header_size];
 
 	file_read_bytes(file, deflated_header_size, deflated);
+	uint32 end_of_file_header_pos = file_get_position(file);
 
 	uint32 bytes_inflated = zlib_inflate_bytes(deflated_header_size, deflated, inflated_header_size, inflated);
 	assert(bytes_inflated == inflated_header_size);
@@ -126,9 +127,91 @@ void geo_file_check(File_Handle file)
 		uint32	geoset_list_index = buffer_read_u32(&inflated_buffer);
 		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
 		{
+			// 0 - triangles
+			// 1 - vertices
+			// 2 - normals
+			// 3 - texcoords
+			// 4 - weights
+			// 5 - material indexes
+			// 6 - grid
 			uint32 deflated_size = buffer_read_u32(&inflated_buffer);
 			uint32 inflated_size = buffer_read_u32(&inflated_buffer);
 			uint32 offset = buffer_read_u32(&inflated_buffer);
+
+			switch (pack_i)
+			{
+			case 0:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + 4 + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				uint16* triangles = (uint16*)inflated_pack;
+				int x = 1;
+				break;}
+
+			case 1:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				float32* vertices = (float32*)inflated_pack;
+				int x = 1;
+				break;}
+
+			case 2:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				float32* normals = (float32*)inflated_pack;
+				int x = 1;
+				break;}
+
+			case 3:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				float32* texcoords = (float32*)inflated_pack;
+				int x = 1;
+				break;}
+
+			case 4:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				float32* weights = (float32*)inflated_pack;
+				int x = 1;
+				break;}
+
+			case 5:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				uint32* material_indexes = (uint32*)inflated_pack;
+				int x = 1;
+				break;}
+
+			case 6:{
+				uint8* deflated_pack = new uint8[deflated_size];
+				uint8* inflated_pack = new uint8[inflated_size];
+				file_set_position(file, end_of_file_header_pos + offset);
+				file_read_bytes(file, deflated_size, deflated_pack);
+				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
+				float32* grid = (float32*)inflated_pack;
+				int x = 1;
+				break;}
+			}
+			
+
 			int x = 1;
 		}
 
