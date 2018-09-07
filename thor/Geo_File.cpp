@@ -37,9 +37,9 @@ void geo_file_check(File_Handle file)
 
 	// info
 	uint32 geo_data_size = buffer_read_u32(&inflated_buffer);
-	uint32 texture_name_block_size = buffer_read_u32(&inflated_buffer);
-	uint32 bone_names_size = buffer_read_u32(&inflated_buffer);
-	uint32 texture_binds_size = buffer_read_u32(&inflated_buffer);
+	uint32 texture_names_section_size = buffer_read_u32(&inflated_buffer);
+	uint32 bone_names_section_size = buffer_read_u32(&inflated_buffer);
+	uint32 texture_binds_section_size = buffer_read_u32(&inflated_buffer);
 
 	// texture names
 	uint8* texture_names_section = inflated_buffer;
@@ -57,33 +57,33 @@ void geo_file_check(File_Handle file)
 		int x = 1;
 	}
 
-	uint32 misaligned_byte_count = (uint64)inflated_buffer % 4;
+	// I *think* there's then padding to an 8-byte boundary, asserting the shit out of this just in case
+	uint32 misaligned_byte_count = (uint64)inflated_buffer % 8;
 	if (misaligned_byte_count)
 	{
-		inflated_buffer += (4 - misaligned_byte_count);
+		uint32 bytes_to_skip = 8 - misaligned_byte_count;
+		for (uint32 i = 0; i < bytes_to_skip; ++i)
+		{
+			assert(!*inflated_buffer);
+			++inflated_buffer;
+		}
 	}
 
-	if (version <= 7)
-	{
-		uint32 u_1 = buffer_read_u32(&inflated_buffer); // todo(jbr) what's this?
-		assert(u_1 == 0);
-	}
-
-	assert((inflated_buffer - texture_names_section) == texture_name_block_size);
+	assert((inflated_buffer - texture_names_section) == texture_names_section_size);
 
 	// bone names
 	uint8* bone_names_section = inflated_buffer;
-	while ((inflated_buffer - bone_names_section) < bone_names_size)
+	while ((inflated_buffer - bone_names_section) < bone_names_section_size)
 	{
 		char bone_name[512];
 		buffer_read_string(&inflated_buffer, sizeof(bone_name), bone_name);
 		int x = 1;
 	}
-	assert((inflated_buffer - bone_names_section) == bone_names_size);
+	assert((inflated_buffer - bone_names_section) == bone_names_section_size);
 
 	// texture binds (used later)
 	uint8* texture_binds_section = inflated_buffer;
-	buffer_skip(&inflated_buffer, texture_binds_size);
+	buffer_skip(&inflated_buffer, texture_binds_section_size);
 
 	// geoset header
 	constexpr uint32 c_name_size = 124;
@@ -132,7 +132,7 @@ void geo_file_check(File_Handle file)
 			int x = 1;
 		}
 
-		if (texture_binds_size && texture_count)
+		if (texture_binds_section_size && texture_count)
 		{
 			uint8* texture_binds = texture_binds_section + texture_binds_offset;
 			uint16 texture_index = buffer_read_u16(&texture_binds);
