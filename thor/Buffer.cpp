@@ -35,6 +35,17 @@ uint8 buffer_read_u8(uint8** inout_buffer)
 	return *p;
 }
 
+int32 buffer_read_i32(uint8** inout_buffer)
+{
+	uint8* buffer = *inout_buffer;
+	int32* p = (int32*)buffer;
+
+	buffer += sizeof(int32);
+	*inout_buffer = buffer;
+
+	return *p;
+}
+
 float32 buffer_read_f32(uint8** inout_buffer)
 {
 	uint8* buffer = *inout_buffer;

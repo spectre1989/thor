@@ -5,6 +5,26 @@
 
 
 
+static uint8* debug_read_geo_pack(File_Handle file, uint32 deflated_size, uint32 inflated_size, uint32 offset)
+{
+	uint8* inflated = new uint8[inflated_size];
+
+	file_set_position(file, offset);
+
+	if (deflated_size)
+	{
+		uint8* deflated = new uint8[deflated_size];
+		file_read_bytes(file, deflated_size, deflated);
+		zlib_inflate_bytes(deflated_size, deflated, inflated_size, inflated);
+	}
+	else
+	{
+		file_read_bytes(file, inflated_size, inflated);
+	}
+
+	return inflated;
+}
+
 void geo_file_check(File_Handle file)
 {
 	uint32 deflated_header_size = file_read_u32(file);
@@ -125,6 +145,10 @@ void geo_file_check(File_Handle file)
 		Vec3	min = buffer_read_vec3(&inflated_buffer);
 		Vec3	max = buffer_read_vec3(&inflated_buffer);
 		uint32	geoset_list_index = buffer_read_u32(&inflated_buffer);
+
+		file_set_position(file, end_of_file_header_pos);
+		uint32 u_4 = file_read_u32(file);
+
 		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
 		{
 			// 0 - triangles
@@ -141,22 +165,119 @@ void geo_file_check(File_Handle file)
 			switch (pack_i)
 			{
 			case 0:{
-				uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + 4 + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				uint16* triangles = (uint16*)inflated_pack;
+				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
+				uint8* delta_bits_data = triangle_data;
+				uint32 delta_bits_offset = 0;
+				uint32 delta_bits_count = triangle_count * 3 * 2; // 2 bits per value, 3 values per triangle
+				uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
+				triangle_data += delta_bits_section_size;
+				float32 inv_scale = (float32)(1 << *triangle_data);
+				++triangle_data;
+
+				uint32 utriangle[3] = { 0, 0, 0 };
+				int32 itriangle[3] = { 0, 0, 0 };
+				for (uint32 i = 0; i < triangle_count; ++i)
+				{
+					for (uint32 j = 0; j < 3; ++j)
+					{
+						uint8 delta_bits = (*delta_bits_data >> delta_bits_offset) & 3;
+						delta_bits_offset += 2;
+						if (delta_bits_offset == 8)
+						{
+							++delta_bits_data;
+							delta_bits_offset = 0;
+						}
+
+						switch (delta_bits)
+						{
+						case 0:
+							++utriangle[j];
+							++itriangle[j];
+							break;
+
+						case 1: {
+							int32 value = buffer_read_u8(&triangle_data) - 127 + 1;
+							utriangle[j] += value;
+							itriangle[j] += value;
+							break; }
+
+						case 2: {
+							int32 value = buffer_read_u16(&triangle_data) - 32767 + 1;
+							utriangle[j] += value;
+							itriangle[j] += value;
+							break; }
+
+						case 3: {
+							int32 value = buffer_read_i32(&triangle_data) + 1;
+							utriangle[j] += value;
+							itriangle[j] += value;
+							break; }
+						}
+
+						assert(itriangle[j] >= 0);
+						assert(utriangle[j] < vertex_count);
+					}
+
+					int x = 1;
+				}
 				int x = 1;
 				break;}
 
 			case 1:{
-				uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				float32* vertices = (float32*)inflated_pack;
+				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
+				uint8* delta_bits_data = vertex_data;
+				uint32 delta_bits_offset = 0;
+				uint32 delta_bits_count = vertex_count * 3 * 2; // 2 bits per value, 3 values per vertex
+				uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
+				vertex_data += delta_bits_section_size;
+				float32 inv_scale = (float32)(1 << *vertex_data);
+				float32 scale = 1.0f;
+				if (inv_scale != 0.0f)
+				{
+					scale = 1 / inv_scale;
+				}
+				++vertex_data;
+
+				float32 vertex[3] = { 0.0f, 0.0f, 0.0f };
+				for (uint32 i = 0; i < vertex_count; ++i)
+				{
+					for (uint32 j = 0; j < 3; ++j)
+					{
+						uint8 delta_bits = (*delta_bits_data >> delta_bits_offset) & 3;
+						delta_bits_offset += 2;
+						if (delta_bits_offset == 8)
+						{
+							++delta_bits_data;
+							delta_bits_offset = 0;
+						}
+
+						switch (delta_bits)
+						{
+						case 0:
+							break;
+
+						case 1: {
+							float32 value = (float32)(buffer_read_u8(&vertex_data) - 127) * scale;
+							vertex[j] += value;
+							break; }
+
+						case 2: {
+							float32 value = (float32)(buffer_read_u16(&vertex_data) - 32767) * scale;
+							vertex[j] += value;
+							break; }
+
+						case 3: {
+							uint32 u_value = buffer_read_u32(&vertex_data);
+							float32 value = *(float32*)&u_value;
+							vertex[j] += value;
+							break; }
+						}
+
+						// todo(jbr) check nan etc
+					}
+
+					int x = 1;
+				}
 				int x = 1;
 				break;}
 
