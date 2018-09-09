@@ -186,8 +186,8 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			uint32 u32 = file_read_u32(file);
-			bin_file_read_string(file, sizeof(buffer), buffer);
+			uint32 u32 = file_read_u32(file);						// tex_unit
+			bin_file_read_string(file, sizeof(buffer), buffer);		// tex_name
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -199,7 +199,7 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 start = file_get_position(file);
 
 			bin_file_read_string(file, sizeof(buffer), buffer); // name
-			float32 f32 = file_read_f32(file); // todo(jbr) what is this?
+			float32 f32 = file_read_f32(file);					// radius
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -210,7 +210,7 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			// todo(jbr) what are these
+			// todo(jbr) what are these, maybe radius, near, far, colours, f_4?
 			float32 f_1 = file_read_f32(file);
 			float32 f_2 = file_read_f32(file);
 			float32 f_3 = file_read_f32(file);
