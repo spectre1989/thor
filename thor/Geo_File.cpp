@@ -25,6 +25,114 @@ static uint8* debug_read_geo_pack(File_Handle file, uint32 deflated_size, uint32
 	return inflated;
 }
 
+static uint8 geo_read_delta_bits(uint8* buffer, uint32 bit_offset)
+{
+	uint8 byte = buffer[bit_offset / 8];
+	uint32 bit_offset_in_byte = bit_offset % 8;
+	
+	return (byte >> bit_offset_in_byte) & 3;
+}
+
+static void geo_read_delta_compressed_triangles(uint8* src, uint32 triangle_count, uint32* dst)
+{
+	uint8* delta_bits_section = src;
+	uint32 delta_bits_count = triangle_count * 3 * 2; // 2 bits per value, 3 values per triangle
+	uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
+
+	uint8* triangle_section = delta_bits_section + delta_bits_section_size + 1; // skip the scale byte, not used
+	
+	int32 triangle[3] = { 0, 0, 0 };
+	uint32 delta_bits_offset = 0;
+	uint8* triangle_data_iter = triangle_section;
+
+	for (uint32 triangle_i = 0; triangle_i < triangle_count; ++triangle_i)
+	{
+		for (uint32 component_i = 0; component_i < 3; ++component_i)
+		{
+			uint8 delta_bits = geo_read_delta_bits(delta_bits_section, delta_bits_offset);
+			delta_bits_offset += 2;
+
+			switch (delta_bits)
+			{
+			case 0:
+				++triangle[component_i];
+				break;
+
+			case 1: 
+				triangle[component_i] += buffer_read_u8(&triangle_data_iter) - 126;
+				break; 
+
+			case 2: 
+				triangle[component_i] += buffer_read_u16(&triangle_data_iter) - 32766;
+				break; 
+
+			case 3: 
+				triangle[component_i] += buffer_read_i32(&triangle_data_iter) + 1;
+				break; 
+			}
+
+			assert(triangle[component_i] >= 0); // todo(jbr) check triangle values are less than vertex count in calling code
+
+			*dst = triangle[component_i];
+			++dst;
+		}
+	}
+}
+
+static void geo_read_delta_compressed_floats(uint8* src, uint32 item_count, uint32 components_per_item, float32* dst)
+{
+	uint8* delta_bits_section = src;
+	uint32 delta_bits_count = item_count * components_per_item * 2; // 2 bits per value
+	uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
+
+	uint8* scale_section = src + delta_bits_section_size;
+	float32 inv_scale = (float32)(1 << *scale_section);
+	float32 scale = 1.0f;
+	if (inv_scale != 0.0f)
+	{
+		scale = 1 / inv_scale;
+	}
+
+	uint8* value_section = scale_section + 1;
+
+	float32 item[3] = { 0.0f, 0.0f, 0.0f };
+	uint32 delta_bits_offset = 0;
+	uint8* value_data_iter = value_section;
+
+	for (uint32 item_i = 0; item_i < item_count; ++item_i)
+	{
+		for (uint32 component_i = 0; component_i < components_per_item; ++component_i)
+		{
+			uint8 delta_bits = geo_read_delta_bits(delta_bits_section, delta_bits_offset);
+			delta_bits_offset += 2;
+
+			switch (delta_bits)
+			{
+			case 0:
+				break;
+
+			case 1: 
+				item[component_i] += (float32)(buffer_read_u8(&value_data_iter) - 127) * scale;
+				break; 
+
+			case 2: 
+				item[component_i] += (float32)(buffer_read_u16(&value_data_iter) - 32767) * scale;
+				break; 
+
+			case 3: 
+				uint32 u_value = buffer_read_u32(&value_data_iter);
+				item[component_i] += *(float32*)&u_value;
+				break; 
+			}
+
+			// todo(jbr) check nan etc
+
+			*dst = item[component_i];
+			++dst;
+		}
+	}
+}
+
 void geo_file_check(File_Handle file)
 {
 	uint32 deflated_header_size = file_read_u32(file);
@@ -160,61 +268,6 @@ void geo_file_check(File_Handle file)
 			{
 			case 0:{
 				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				uint8* delta_bits_data = triangle_data;
-				uint32 delta_bits_offset = 0;
-				uint32 delta_bits_count = triangle_count * 3 * 2; // 2 bits per value, 3 values per triangle
-				uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
-				triangle_data += delta_bits_section_size;
-				float32 inv_scale = (float32)(1 << *triangle_data);
-				++triangle_data;
-
-				uint32 utriangle[3] = { 0, 0, 0 };
-				int32 itriangle[3] = { 0, 0, 0 };
-				for (uint32 i = 0; i < triangle_count; ++i)
-				{
-					for (uint32 j = 0; j < 3; ++j)
-					{
-						uint8 delta_bits = (*delta_bits_data >> delta_bits_offset) & 3;
-						delta_bits_offset += 2;
-						if (delta_bits_offset == 8)
-						{
-							++delta_bits_data;
-							delta_bits_offset = 0;
-						}
-
-						switch (delta_bits)
-						{
-						case 0:
-							++utriangle[j];
-							++itriangle[j];
-							break;
-
-						case 1: {
-							int32 value = buffer_read_u8(&triangle_data) - 127 + 1;
-							utriangle[j] += value;
-							itriangle[j] += value;
-							break; }
-
-						case 2: {
-							int32 value = buffer_read_u16(&triangle_data) - 32767 + 1;
-							utriangle[j] += value;
-							itriangle[j] += value;
-							break; }
-
-						case 3: {
-							int32 value = buffer_read_i32(&triangle_data) + 1;
-							utriangle[j] += value;
-							itriangle[j] += value;
-							break; }
-						}
-
-						assert(itriangle[j] >= 0);
-						assert(utriangle[j] < vertex_count);
-					}
-
-					int x = 1;
-				}
-				int x = 1;
 				break;}
 
 			case 1:{
