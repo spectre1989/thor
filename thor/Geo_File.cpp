@@ -33,7 +33,7 @@ static uint8 geo_read_delta_bits(uint8* buffer, uint32 bit_offset)
 	return (byte >> bit_offset_in_byte) & 3;
 }
 
-static void geo_read_delta_compressed_triangles(uint8* src, uint32 triangle_count, uint32* dst)
+static void geo_unpack_delta_compressed_triangles(uint8* src, uint32 triangle_count, uint32* dst)
 {
 	uint8* delta_bits_section = src;
 	uint32 delta_bits_count = triangle_count * 3 * 2; // 2 bits per value, 3 values per triangle
@@ -79,7 +79,7 @@ static void geo_read_delta_compressed_triangles(uint8* src, uint32 triangle_coun
 	}
 }
 
-static void geo_read_delta_compressed_floats(uint8* src, uint32 item_count, uint32 components_per_item, float32* dst)
+static void geo_unpack_delta_compressed_floats(uint8* src, uint32 item_count, uint32 components_per_item, float32* dst)
 {
 	uint8* delta_bits_section = src;
 	uint32 delta_bits_count = item_count * components_per_item * 2; // 2 bits per value
@@ -266,121 +266,48 @@ void geo_file_check(File_Handle file)
 
 			switch (pack_i)
 			{
-			case 0:{
+			case 0: 
+			{
 				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				break;}
-
-			case 1:{
-				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				uint8* delta_bits_data = vertex_data;
-				uint32 delta_bits_offset = 0;
-				uint32 delta_bits_count = vertex_count * 3 * 2; // 2 bits per value, 3 values per vertex
-				uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
-				vertex_data += delta_bits_section_size;
-				float32 inv_scale = (float32)(1 << *vertex_data);
-				float32 scale = 1.0f;
-				if (inv_scale != 0.0f)
-				{
-					scale = 1 / inv_scale;
-				}
-				++vertex_data;
-
-				float32 vertex[3] = { 0.0f, 0.0f, 0.0f };
-				for (uint32 i = 0; i < vertex_count; ++i)
-				{
-					for (uint32 j = 0; j < 3; ++j)
-					{
-						uint8 delta_bits = (*delta_bits_data >> delta_bits_offset) & 3;
-						delta_bits_offset += 2;
-						if (delta_bits_offset == 8)
-						{
-							++delta_bits_data;
-							delta_bits_offset = 0;
-						}
-
-						switch (delta_bits)
-						{
-						case 0:
-							break;
-
-						case 1: {
-							float32 value = (float32)(buffer_read_u8(&vertex_data) - 127) * scale;
-							vertex[j] += value;
-							break; }
-
-						case 2: {
-							float32 value = (float32)(buffer_read_u16(&vertex_data) - 32767) * scale;
-							vertex[j] += value;
-							break; }
-
-						case 3: {
-							uint32 u_value = buffer_read_u32(&vertex_data);
-							float32 value = *(float32*)&u_value;
-							vertex[j] += value;
-							break; }
-						}
-
-						// todo(jbr) check nan etc
-					}
-
-					int x = 1;
-				}
-				int x = 1;
-				break;}
-
-			case 2:{
-				/*uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				float32* normals = (float32*)inflated_pack;
-				int x = 1;*/
-				break;}
-
-			case 3:{
-				/*uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				float32* texcoords = (float32*)inflated_pack;
-				int x = 1;*/
-				break;}
-
-			case 4:{
-				/*uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				float32* weights = (float32*)inflated_pack;
-				int x = 1;*/
-				break;}
-
-			case 5:{
-				/*uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				uint32* material_indexes = (uint32*)inflated_pack;
-				int x = 1;*/
-				break;}
-
-			case 6:{
-				/*uint8* deflated_pack = new uint8[deflated_size];
-				uint8* inflated_pack = new uint8[inflated_size];
-				file_set_position(file, end_of_file_header_pos + offset);
-				file_read_bytes(file, deflated_size, deflated_pack);
-				zlib_inflate_bytes(deflated_size, deflated_pack, inflated_size, inflated_pack);
-				float32* grid = (float32*)inflated_pack;
-				int x = 1;*/
-				break;}
+				uint32* triangles = new uint32[triangle_count * 3];
+				geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
+				break;
 			}
-			
 
-			int x = 1;
+			case 1:
+			{
+				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
+				float32* vertices = new float32[vertex_count * 3];
+				geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
+				break;
+			}
+
+			case 2:
+			{
+				uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
+				float32* normals = new float32[vertex_count * 3];
+				geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
+				// todo(jbr) these will need normalising
+				break;
+			}
+
+			case 3:
+			{
+				uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
+				float32* texcoords = new float32[vertex_count * 2];
+				geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
+				break;
+			}
+
+			case 4:
+				break;
+
+			case 5:
+				break;
+
+			case 6:
+				break;
+			}
 		}
 
 		if (texture_binds_section_size && texture_count)
@@ -388,9 +315,6 @@ void geo_file_check(File_Handle file)
 			uint8* texture_binds = texture_binds_section + texture_binds_offset;
 			uint16 texture_index = buffer_read_u16(&texture_binds);
 			uint16 triangle_count = buffer_read_u16(&texture_binds);
-			int x = 1;
 		}
 	}
-
-	int x = 1;
 }
