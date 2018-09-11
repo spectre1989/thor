@@ -133,7 +133,7 @@ static void geo_unpack_delta_compressed_floats(uint8* src, uint32 item_count, ui
 	}
 }
 
-void geo_file_check(File_Handle file)
+void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 {
 	uint32 deflated_header_size = file_read_u32(file);
 	deflated_header_size -= 4;

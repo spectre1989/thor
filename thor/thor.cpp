@@ -1,5 +1,4 @@
-﻿#include <Windows.h> // todo(jbr) get rid of this include
-#include "Bin_File.h"
+﻿#include "Bin_File.h"
 #include "Geo_File.h"
 #include "File.h"
 #include "Memory.h"
@@ -7,6 +6,18 @@
 #include "String.h"
 
 
+
+static void on_geo_file_found(const char* path, void* state)
+{
+	Linear_Allocator* allocator = (Linear_Allocator*)state;
+	Linear_Allocator restore_allocator = *allocator; // use this to clear the allocator after
+
+	File_Handle file_handle = file_open_read(path);
+	geo_file_check(file_handle, allocator);
+	file_close(file_handle);
+
+	*allocator = restore_allocator;
+}
 
 int main(int argc, const char** argv)
 {
@@ -18,7 +29,10 @@ int main(int argc, const char** argv)
 	bool unpack_piggs = true;
 	bool check_bins = false;
 
-	geo_file_check(file_open_read(argv[1]));
+	Linear_Allocator allocator = {};
+	linear_allocator_create(&allocator, megabytes(32));
+	file_search(argv[1], "*.geo", on_geo_file_found, /*state*/&allocator);
+
 	return 0;
 
 	if (unpack_piggs)

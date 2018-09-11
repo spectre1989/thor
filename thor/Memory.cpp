@@ -2,6 +2,12 @@
 
 
 
+void linear_allocator_create(Linear_Allocator* linear_allocator, uint32 size)
+{
+	linear_allocator->memory = new uint8[size];
+	linear_allocator->bytes_available = size;
+}
+
 uint8* linear_allocator_alloc(Linear_Allocator* linear_allocator, uint32 size)
 {
 	assert(size <= linear_allocator->bytes_available);

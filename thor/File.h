@@ -5,6 +5,7 @@
 
 
 typedef void* File_Handle; // means that we don't have to include windows.h in this header
+typedef void (*On_File_Found_Function)(const char* path, void* state);
 
 File_Handle file_open_read(const char* path);
 File_Handle file_open_write(const char* path);
@@ -19,3 +20,4 @@ uint32 file_get_position(File_Handle file);
 void file_set_position(File_Handle file, uint32 position);
 void file_write_bytes(File_Handle file, uint32 byte_count, void* bytes);
 void dir_create(const char* path);
+void file_search(const char* dir_path, const char* search_term, On_File_Found_Function on_file_found, void* state);

@@ -45,8 +45,8 @@ uint32 string_copy(const char* src, char* dst)
 
 uint32 string_concat(const char* s1, const char* s2, char* dst)
 {
-	uint32 chars_copied = string_copy(s1, dst);
-	chars_copied += string_copy(s2, &dst[chars_copied]);
+	uint32 string_length = string_copy(s1, dst);
+	string_length += string_copy(s2, &dst[string_length]);
 
-	return chars_copied;
+	return string_length;
 }

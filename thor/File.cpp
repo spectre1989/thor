@@ -1,6 +1,7 @@
 #include "File.h"
 
 #include <Windows.h>
+#include "String.h"
 
 
 
@@ -84,4 +85,11 @@ void dir_create(const char* path)
 {
 	bool success = CreateDirectoryA(path, /*lpSecurityAttributes*/ nullptr);
 	assert(success || GetLastError() == ERROR_ALREADY_EXISTS);
+}
+
+void file_search(const char* dir_path, const char* search_term, On_File_Found_Function on_file_found, void* state)
+{
+	char search_path[MAX_PATH + 1];
+	uint32 search_path_length = string_concat(search_path, dir_path, "/");
+	search_path_length += string_copy(&search_path[search_path_length], search_term);
 }
