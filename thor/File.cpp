@@ -90,6 +90,41 @@ void dir_create(const char* path)
 void file_search(const char* dir_path, const char* search_term, On_File_Found_Function on_file_found, void* state)
 {
 	char search_path[MAX_PATH + 1];
-	uint32 search_path_length = string_concat(search_path, dir_path, "/");
-	search_path_length += string_copy(&search_path[search_path_length], search_term);
+	uint32 search_path_length = string_concat(dir_path, "/", search_path);
+	search_path_length += string_copy(search_term, &search_path[search_path_length]);
+
+	WIN32_FIND_DATAA find_data;
+	HANDLE find_handle = FindFirstFileA(search_path, &find_data);
+	if (find_handle != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+		} while (FindNextFileA(find_handle, &find_data));
+
+		FindClose(find_handle);
+	}
+
+	// now search for directories
+	string_concat(dir_path, "/*", search_path);
+	find_handle = FindFirstFileA(search_path, &find_data);
+	if (find_handle != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			int is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+			if (is_directory)
+			{
+				if (!string_equals(find_data.cFileName, ".") && !string_equals(find_data.cFileName, ".."))
+				{
+					char sub_dir_path[MAX_PATH + 1];
+					uint32 sub_dir_path_length = string_concat(dir_path, "/", sub_dir_path);
+					sub_dir_path_length += string_copy(find_data.cFileName, &sub_dir_path[sub_dir_path_length]);
+
+					file_search(sub_dir_path, search_term, on_file_found, state);
+				}
+			}
+		} while (FindNextFileA(find_handle, &find_data));
+
+		FindClose(find_handle);
+	}
 }

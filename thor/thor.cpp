@@ -4,6 +4,7 @@
 #include "Memory.h"
 #include "Pigg_File.h"
 #include "String.h"
+#include <Windows.h> // todo(jbr)
 
 
 
@@ -16,7 +17,7 @@ static void on_geo_file_found(const char* path, void* state)
 	geo_file_check(file_handle, allocator);
 	file_close(file_handle);
 
-	*allocator = restore_allocator;
+	*allocator = restore_allocator;// todo(jbr) make a reset allocator function
 }
 
 int main(int argc, const char** argv)
@@ -55,7 +56,7 @@ int main(int argc, const char** argv)
 			string_copy(find_data.cFileName, &path_buffer[base_path_length]);
 
 			// reset allocator
-			allocator.memory = memory;
+			allocator.memory = memory; // todo(jbr) make a reset allocator function, check all usages of allocator
 			allocator.bytes_available = c_memory_size;
 
 			unpack_pigg_file(path_buffer, &allocator);
