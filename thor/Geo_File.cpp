@@ -1,19 +1,21 @@
 #include "Geo_File.h"
 
+#include <cmath>
 #include "Buffer.h"
+#include "Memory.h"
 #include "Zlib.h"
 
 
 
-static uint8* debug_read_geo_pack(File_Handle file, uint32 deflated_size, uint32 inflated_size, uint32 offset)
+static uint8* debug_read_geo_pack(File_Handle file, uint32 deflated_size, uint32 inflated_size, uint32 offset, Linear_Allocator* allocator)
 {
-	uint8* inflated = new uint8[inflated_size];
+	uint8* inflated = linear_allocator_alloc(allocator, inflated_size);
 
 	file_set_position(file, offset);
 
 	if (deflated_size)
 	{
-		uint8* deflated = new uint8[deflated_size];
+		uint8* deflated = linear_allocator_alloc(allocator, deflated_size);
 		file_read_bytes(file, deflated_size, deflated);
 		zlib_inflate_bytes(deflated_size, deflated, inflated_size, inflated);
 	}
@@ -153,8 +155,14 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		inflated_header_size = field_2;
 	}
 
-	uint8* deflated = new uint8[deflated_header_size];
-	uint8* inflated = new uint8[inflated_header_size];
+	if (version > 0)
+	{
+		// todo(jbr) not yet supported
+		return;
+	}
+
+	uint8* deflated = linear_allocator_alloc(allocator, deflated_header_size);
+	uint8* inflated = linear_allocator_alloc(allocator, inflated_header_size);
 
 	file_read_bytes(file, deflated_header_size, deflated);
 	uint32 end_of_file_header_pos = file_get_position(file);
@@ -186,19 +194,8 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		int x = 1;
 	}
 
-	// I *think* there's then padding to an 8-byte boundary, asserting the shit out of this just in case
-	uint32 misaligned_byte_count = (uint64)inflated_buffer % 8;
-	if (misaligned_byte_count)
-	{
-		uint32 bytes_to_skip = 8 - misaligned_byte_count;
-		for (uint32 i = 0; i < bytes_to_skip; ++i)
-		{
-			assert(!*inflated_buffer);
-			++inflated_buffer;
-		}
-	}
-
-	assert((inflated_buffer - texture_names_section) == texture_names_section_size);
+	// there's some padding, couldn't figure out the rules for it, so just doing this
+	inflated_buffer = texture_names_section + texture_names_section_size;
 
 	// bone names
 	uint8* bone_names_section = inflated_buffer;
@@ -268,33 +265,54 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			{
 			case 0: 
 			{
-				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				uint32* triangles = new uint32[triangle_count * 3];
+				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				uint32* triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * triangle_count * 3);
 				geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
 				break;
 			}
 
 			case 1:
 			{
-				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				float32* vertices = new float32[vertex_count * 3];
+				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				float32* vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
 				geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
 				break;
 			}
 
 			case 2:
 			{
-				uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				float32* normals = new float32[vertex_count * 3];
+				uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				float32* normals = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
 				geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
-				// todo(jbr) these will need normalising
+				
+				for (uint32 i = 0; i < vertex_count; ++i)
+				{
+					uint32 vertex_start = i * 3;
+					float x = normals[vertex_start];
+					float y = normals[vertex_start + 1];
+					float z = normals[vertex_start + 2];
+					float length_sq = (x * x) + (y * y) + (z * z);
+					if (length_sq > 0.0f)
+					{
+						float length = sqrt(length_sq);
+						float inv_length = 1 / length;
+
+						x *= inv_length;
+						y *= inv_length;
+						z *= inv_length;
+
+						normals[vertex_start] = x;
+						normals[vertex_start + 1] = y;
+						normals[vertex_start + 2] = z;
+					}
+				}
 				break;
 			}
 
 			case 3:
 			{
-				uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset);
-				float32* texcoords = new float32[vertex_count * 2];
+				uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				float32* texcoords = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 2);
 				geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
 				break;
 			}

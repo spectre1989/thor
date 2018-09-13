@@ -99,6 +99,11 @@ void file_search(const char* dir_path, const char* search_term, On_File_Found_Fu
 	{
 		do
 		{
+			char found_file_path[MAX_PATH + 1];
+			uint32 found_file_path_length = string_concat(dir_path, "/", found_file_path);
+			found_file_path_length += string_copy(find_data.cFileName, &found_file_path[found_file_path_length]);
+
+			on_file_found(found_file_path, state);
 		} while (FindNextFileA(find_handle, &find_data));
 
 		FindClose(find_handle);
