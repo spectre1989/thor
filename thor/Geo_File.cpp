@@ -155,8 +155,37 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		inflated_header_size = field_2;
 	}
 
-	if (version > 0)
+	//if (version > 0)
+	if (version != 3)
 	{
+		// all geo versions present in i24 data
+		switch (version)
+		{
+		case 0:
+			break;
+
+		case 2:
+			break;
+
+		case 3:
+			break;
+
+		case 4:
+			break;
+
+		case 5:
+			break;
+
+		case 7:
+			break;
+
+		case 8:
+			break;
+
+		default:
+			assert(false);
+			break;
+		}
 		// todo(jbr) not yet supported
 		return;
 	}
@@ -177,6 +206,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	uint32 texture_names_section_size = buffer_read_u32(&inflated_buffer);
 	uint32 bone_names_section_size = buffer_read_u32(&inflated_buffer);
 	uint32 texture_binds_section_size = buffer_read_u32(&inflated_buffer);
+	uint32 unknown_section_size = buffer_read_u32(&inflated_buffer); // version 2 only
 
 	// texture names
 	uint8* texture_names_section = inflated_buffer;
@@ -204,6 +234,16 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	// texture binds (used later)
 	uint8* texture_binds_section = inflated_buffer;
 	buffer_skip(&inflated_buffer, texture_binds_section_size);
+
+	// unknown section 2 (found in version 2)
+	uint8* unknown_section = inflated_buffer;
+	uint32 unknown_u32_1 = buffer_read_u32(&inflated_buffer);
+	uint32 unknown_u32_2 = buffer_read_u32(&inflated_buffer);
+	uint32 unknown_u32_3 = buffer_read_u32(&inflated_buffer);
+	float32 unknown_f32_4 = buffer_read_f32(&inflated_buffer);
+	uint32 unknown_u32_5 = buffer_read_u32(&inflated_buffer);
+	float32 unknown_f32_6 = buffer_read_f32(&inflated_buffer);
+	inflated_buffer = unknown_section + unknown_section_size;
 
 	// geoset header
 	constexpr uint32 c_name_size = 124;
@@ -245,9 +285,6 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		Vec3	max = buffer_read_vec3(&inflated_buffer);
 		uint32	geoset_list_index = buffer_read_u32(&inflated_buffer);
 
-		file_set_position(file, end_of_file_header_pos);
-		uint32 u_4 = file_read_u32(file);
-
 		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
 		{
 			// 0 - triangles
@@ -261,11 +298,27 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			uint32 inflated_size = buffer_read_u32(&inflated_buffer);
 			uint32 offset = buffer_read_u32(&inflated_buffer);
 
+			uint32 start_of_packed_data = end_of_file_header_pos;
+			switch (version)
+			{
+			case 0:
+				start_of_packed_data += 4;
+				break;
+
+			case 2:
+				// it starts right after header
+				break;
+
+			default:
+				assert(false);
+				break;
+			}
+
 			switch (pack_i)
 			{
 			case 0: 
 			{
-				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
 				uint32* triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * triangle_count * 3);
 				geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
 				break;
@@ -273,7 +326,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 
 			case 1:
 			{
-				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
 				float32* vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
 				geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
 				break;
@@ -281,7 +334,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 
 			case 2:
 			{
-				uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
 				float32* normals = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
 				geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
 				
@@ -311,7 +364,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 
 			case 3:
 			{
-				uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, end_of_file_header_pos + 4 + offset, allocator);
+				uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
 				float32* texcoords = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 2);
 				geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
 				break;
