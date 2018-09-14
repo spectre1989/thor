@@ -18,6 +18,7 @@ void linear_allocator_reset(Linear_Allocator* linear_allocator)
 
 uint8* linear_allocator_alloc(Linear_Allocator* linear_allocator, uint32 size)
 {
+	assert(size > 0);
 	assert(size <= linear_allocator->bytes_available);
 
 	uint8* result = linear_allocator->next;
