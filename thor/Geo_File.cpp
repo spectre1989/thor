@@ -157,647 +157,8 @@ static float32* geo_unpack_delta_compressed_floats(File_Handle file, uint32 defl
 	return nullptr;
 }
 
-
-//
-//static void geo_file_check_v4(File_Handle file, uint32 file_end_of_header_pos, uint8* header, Linear_Allocator* allocator)
-//{
-//	// info
-//	uint32 geo_data_size = buffer_read_u32(&header);
-//	uint32 texture_names_section_size = buffer_read_u32(&header);
-//	uint32 bone_names_section_size = buffer_read_u32(&header);
-//	uint32 texture_binds_section_size = buffer_read_u32(&header);
-//	uint32 unknown_section_size = buffer_read_u32(&header);
-//
-//	// texture names
-//	uint8* texture_names_section = header;
-//
-//	uint32 texture_count = buffer_read_u32(&header);
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		uint32 offset = buffer_read_u32(&header);
-//		int x = 1;
-//	}
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		char texture_name[512];
-//		buffer_read_string(&header, sizeof(texture_name), texture_name);
-//		int x = 1;
-//	}
-//
-//	// there's some padding, couldn't figure out the rules for it, so just doing this
-//	header = texture_names_section + texture_names_section_size;
-//
-//	// bone names
-//	uint8* bone_names_section = header;
-//	buffer_skip(&header, bone_names_section_size);
-//
-//	// texture binds (used later)
-//	uint8* texture_binds_section = header;
-//	buffer_skip(&header, texture_binds_section_size);
-//
-//	// unknown section
-//	uint8* unknown_section = header;
-//	if (unknown_section_size)
-//	{
-//		uint32 unknown_u32_1 = buffer_read_u32(&header);
-//		uint32 unknown_u32_2 = buffer_read_u32(&header);
-//		uint32 unknown_u32_3 = buffer_read_u32(&header);
-//		float32 unknown_f32_4 = buffer_read_f32(&header);
-//		uint32 unknown_u32_5 = buffer_read_u32(&header);
-//		float32 unknown_f32_6 = buffer_read_f32(&header);
-//	}
-//	header = unknown_section + unknown_section_size;
-//
-//	// geoset header
-//	constexpr uint32 c_name_size = 124;
-//	char name[c_name_size];
-//	buffer_read_bytes(&header, c_name_size, (uint8*)name);
-//
-//	uint32 parent_index = buffer_read_u32(&header);
-//	uint32 u_2 = buffer_read_u32(&header);
-//	uint32 subs_index = buffer_read_u32(&header);
-//	uint32 model_count = buffer_read_u32(&header);
-//
-//	for (uint32 model_i = 0; model_i < model_count; ++model_i)
-//	{
-//		uint32	flag = buffer_read_u32(&header);
-//		float32 radius = buffer_read_f32(&header);
-//		uint32	texture_count = buffer_read_u32(&header);
-//		uint32	texture_binds_offset = buffer_read_u32(&header);
-//		uint32	vertex_count = buffer_read_u32(&header);
-//		uint32	triangle_count = buffer_read_u32(&header);
-//
-//		header += 80;
-//
-//		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
-//		{
-//			// 0 - triangles
-//			// 1 - vertices
-//			// 2 - normals
-//			// 3 - texcoords
-//			// 4 - weights
-//			// 5 - material indexes
-//			// 6 - grid
-//			uint32 deflated_size = buffer_read_u32(&header);
-//			uint32 inflated_size = buffer_read_u32(&header);
-//			uint32 offset = buffer_read_u32(&header);
-//
-//			if (inflated_size)
-//			{
-//				uint32 start_of_packed_data = file_end_of_header_pos;
-//
-//				switch (pack_i)
-//				{
-//				case 0:
-//				{
-//					uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					uint32* triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * triangle_count * 3);
-//					geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
-//					break;
-//				}
-//
-//				case 1:
-//				{
-//					uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
-//					break;
-//				}
-//
-//				case 2:
-//				{
-//					uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* normals = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
-//
-//					for (uint32 i = 0; i < vertex_count; ++i)
-//					{
-//						uint32 vertex_start = i * 3;
-//						float x = normals[vertex_start];
-//						float y = normals[vertex_start + 1];
-//						float z = normals[vertex_start + 2];
-//						float length_sq = (x * x) + (y * y) + (z * z);
-//						if (length_sq > 0.0f)
-//						{
-//							float length = sqrt(length_sq);
-//							float inv_length = 1 / length;
-//
-//							x *= inv_length;
-//							y *= inv_length;
-//							z *= inv_length;
-//
-//							normals[vertex_start] = x;
-//							normals[vertex_start + 1] = y;
-//							normals[vertex_start + 2] = z;
-//						}
-//					}
-//					break;
-//				}
-//
-//				case 3:
-//				{
-//					uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* texcoords = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 2);
-//					geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
-//					break;
-//				}
-//
-//				case 4:
-//					break;
-//
-//				case 5:
-//					break;
-//
-//				case 6:
-//					break;
-//				}
-//			}
-//		}
-//
-//		header += 44;
-//
-//		if (texture_binds_section_size && texture_count)
-//		{
-//			uint8* texture_binds = texture_binds_section + texture_binds_offset;
-//			uint16 texture_index = buffer_read_u16(&texture_binds);
-//			uint16 triangle_count = buffer_read_u16(&texture_binds);
-//		}
-//	}
-//}
-//
-//static void geo_file_check_v5(File_Handle file, uint32 file_end_of_header_pos, uint8* header, Linear_Allocator* allocator)
-//{
-//	// info
-//	uint32 geo_data_size = buffer_read_u32(&header);
-//	uint32 texture_names_section_size = buffer_read_u32(&header);
-//	uint32 bone_names_section_size = buffer_read_u32(&header);
-//	uint32 texture_binds_section_size = buffer_read_u32(&header);
-//	uint32 unknown_section_size = buffer_read_u32(&header);
-//
-//	// texture names
-//	uint8* texture_names_section = header;
-//
-//	uint32 texture_count = buffer_read_u32(&header);
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		uint32 offset = buffer_read_u32(&header);
-//		int x = 1;
-//	}
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		char texture_name[512];
-//		buffer_read_string(&header, sizeof(texture_name), texture_name);
-//		int x = 1;
-//	}
-//
-//	// there's some padding, couldn't figure out the rules for it, so just doing this
-//	header = texture_names_section + texture_names_section_size;
-//
-//	// bone names
-//	uint8* bone_names_section = header;
-//	buffer_skip(&header, bone_names_section_size);
-//
-//	// texture binds (used later)
-//	uint8* texture_binds_section = header;
-//	buffer_skip(&header, texture_binds_section_size);
-//
-//	// unknown section
-//	uint8* unknown_section = header;
-//	if (unknown_section_size)
-//	{
-//		uint32 unknown_u32_1 = buffer_read_u32(&header);
-//		uint32 unknown_u32_2 = buffer_read_u32(&header);
-//		uint32 unknown_u32_3 = buffer_read_u32(&header);
-//		float32 unknown_f32_4 = buffer_read_f32(&header);
-//		uint32 unknown_u32_5 = buffer_read_u32(&header);
-//		float32 unknown_f32_6 = buffer_read_f32(&header);
-//	}
-//	header = unknown_section + unknown_section_size;
-//
-//	// geoset header
-//	constexpr uint32 c_name_size = 124;
-//	char name[c_name_size];
-//	buffer_read_bytes(&header, c_name_size, (uint8*)name);
-//
-//	uint32 parent_index = buffer_read_u32(&header);
-//	uint32 u_2 = buffer_read_u32(&header);
-//	uint32 subs_index = buffer_read_u32(&header);
-//	uint32 model_count = buffer_read_u32(&header);
-//
-//	for (uint32 model_i = 0; model_i < model_count; ++model_i)
-//	{
-//		uint32	flag = buffer_read_u32(&header);
-//		float32 radius = buffer_read_f32(&header);
-//		uint32	texture_count = buffer_read_u32(&header);
-//		uint32	texture_binds_offset = buffer_read_u32(&header);
-//		uint32	vertex_count = buffer_read_u32(&header);
-//		uint32	triangle_count = buffer_read_u32(&header);
-//
-//		header += 80;
-//
-//		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
-//		{
-//			// 0 - triangles
-//			// 1 - vertices
-//			// 2 - normals
-//			// 3 - texcoords
-//			// 4 - weights
-//			// 5 - material indexes
-//			// 6 - grid
-//			uint32 deflated_size = buffer_read_u32(&header);
-//			uint32 inflated_size = buffer_read_u32(&header);
-//			uint32 offset = buffer_read_u32(&header);
-//
-//			if (inflated_size)
-//			{
-//				uint32 start_of_packed_data = file_end_of_header_pos;
-//
-//				switch (pack_i)
-//				{
-//				case 0:
-//				{
-//					uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					uint32* triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * triangle_count * 3);
-//					geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
-//					break;
-//				}
-//
-//				case 1:
-//				{
-//					uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
-//					break;
-//				}
-//
-//				case 2:
-//				{
-//					uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* normals = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
-//
-//					for (uint32 i = 0; i < vertex_count; ++i)
-//					{
-//						uint32 vertex_start = i * 3;
-//						float x = normals[vertex_start];
-//						float y = normals[vertex_start + 1];
-//						float z = normals[vertex_start + 2];
-//						float length_sq = (x * x) + (y * y) + (z * z);
-//						if (length_sq > 0.0f)
-//						{
-//							float length = sqrt(length_sq);
-//							float inv_length = 1 / length;
-//
-//							x *= inv_length;
-//							y *= inv_length;
-//							z *= inv_length;
-//
-//							normals[vertex_start] = x;
-//							normals[vertex_start + 1] = y;
-//							normals[vertex_start + 2] = z;
-//						}
-//					}
-//					break;
-//				}
-//
-//				case 3:
-//				{
-//					uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* texcoords = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 2);
-//					geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
-//					break;
-//				}
-//
-//				case 4:
-//					break;
-//
-//				case 5:
-//					break;
-//
-//				case 6:
-//					break;
-//				}
-//			}
-//		}
-//
-//		header += 20;
-//
-//		if (texture_binds_section_size && texture_count)
-//		{
-//			uint8* texture_binds = texture_binds_section + texture_binds_offset;
-//			uint16 texture_index = buffer_read_u16(&texture_binds);
-//			uint16 triangle_count = buffer_read_u16(&texture_binds);
-//		}
-//	}
-//}
-//
-//static void geo_file_check_v7(File_Handle file, uint32 file_end_of_header_pos, uint8* header, Linear_Allocator* allocator)
-//{
-//	// info
-//	uint32 geo_data_size = buffer_read_u32(&header);
-//	uint32 texture_names_section_size = buffer_read_u32(&header);
-//	uint32 bone_names_section_size = buffer_read_u32(&header);
-//	uint32 texture_binds_section_size = buffer_read_u32(&header);
-//
-//	// texture names
-//	uint8* texture_names_section = header;
-//
-//	uint32 texture_count = buffer_read_u32(&header);
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		uint32 offset = buffer_read_u32(&header);
-//		int x = 1;
-//	}
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		char texture_name[512];
-//		buffer_read_string(&header, sizeof(texture_name), texture_name);
-//		int x = 1;
-//	}
-//
-//	// there's some padding, couldn't figure out the rules for it, so just doing this
-//	header = texture_names_section + texture_names_section_size;
-//
-//	// bone names
-//	uint8* bone_names_section = header;
-//	buffer_skip(&header, bone_names_section_size);
-//
-//	// texture binds (used later)
-//	uint8* texture_binds_section = header;
-//	buffer_skip(&header, texture_binds_section_size);
-//
-//	// geoset header
-//	constexpr uint32 c_name_size = 124;
-//	char name[c_name_size];
-//	buffer_read_bytes(&header, c_name_size, (uint8*)name);
-//
-//	uint32 parent_index = buffer_read_u32(&header);
-//	uint32 u_2 = buffer_read_u32(&header);
-//	uint32 subs_index = buffer_read_u32(&header);
-//	uint32 model_count = buffer_read_u32(&header);
-//
-//	for (uint32 model_i = 0; model_i < model_count; ++model_i)
-//	{
-//		uint32 flags = buffer_read_u32(&header);
-//		float32 radius = buffer_read_f32(&header);
-//		uint32 texture_count = buffer_read_u32(&header);
-//		uint32 texture_binds_offset = buffer_read_u32(&header);
-//		uint32 vertex_count = buffer_read_u32(&header);
-//		uint32 triangle_count = buffer_read_u32(&header);
-//		
-//		header += 80;
-//
-//		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
-//		{
-//			// 0 - triangles
-//			// 1 - vertices
-//			// 2 - normals
-//			// 3 - texcoords
-//			// 4 - weights
-//			// 5 - material indexes
-//			// 6 - grid
-//			uint32 deflated_size = buffer_read_u32(&header);
-//			uint32 inflated_size = buffer_read_u32(&header);
-//			uint32 offset = buffer_read_u32(&header);
-//
-//			if (inflated_size)
-//			{
-//				uint32 start_of_packed_data = file_end_of_header_pos;
-//
-//				switch (pack_i)
-//				{
-//				case 0:
-//				{
-//					uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					uint32* triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * triangle_count * 3);
-//					geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
-//					break;
-//				}
-//
-//				case 1:
-//				{
-//					uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
-//					break;
-//				}
-//
-//				case 2:
-//				{
-//					uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* normals = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
-//
-//					for (uint32 i = 0; i < vertex_count; ++i)
-//					{
-//						uint32 vertex_start = i * 3;
-//						float x = normals[vertex_start];
-//						float y = normals[vertex_start + 1];
-//						float z = normals[vertex_start + 2];
-//						float length_sq = (x * x) + (y * y) + (z * z);
-//						if (length_sq > 0.0f)
-//						{
-//							float length = sqrt(length_sq);
-//							float inv_length = 1 / length;
-//
-//							x *= inv_length;
-//							y *= inv_length;
-//							z *= inv_length;
-//
-//							normals[vertex_start] = x;
-//							normals[vertex_start + 1] = y;
-//							normals[vertex_start + 2] = z;
-//						}
-//					}
-//					break;
-//				}
-//
-//				case 3:
-//				{
-//					uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* texcoords = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 2);
-//					geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
-//					break;
-//				}
-//
-//				case 4:
-//					break;
-//
-//				case 5:
-//					break;
-//
-//				case 6:
-//					break;
-//				}
-//			}
-//		}
-//
-//		header += 44;
-//
-//		if (texture_binds_section_size && texture_count)
-//		{
-//			uint8* texture_binds = texture_binds_section + texture_binds_offset;
-//			uint16 texture_index = buffer_read_u16(&texture_binds);
-//			uint16 triangle_count = buffer_read_u16(&texture_binds);
-//		}
-//	}
-//}
-//
-//static void geo_file_check_v8(File_Handle file, uint32 file_end_of_header_pos, uint8* header, Linear_Allocator* allocator)
-//{
-//	// info
-//	uint32 geo_data_size = buffer_read_u32(&header);
-//	uint32 texture_names_section_size = buffer_read_u32(&header);
-//	uint32 bone_names_section_size = buffer_read_u32(&header);
-//	uint32 texture_binds_section_size = buffer_read_u32(&header);
-//
-//	// texture names
-//	uint8* texture_names_section = header;
-//
-//	uint32 texture_count = buffer_read_u32(&header);
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		uint32 offset = buffer_read_u32(&header);
-//		int x = 1;
-//	}
-//	for (uint32 texture_i = 0; texture_i < texture_count; ++texture_i)
-//	{
-//		char texture_name[512];
-//		buffer_read_string(&header, sizeof(texture_name), texture_name);
-//		int x = 1;
-//	}
-//
-//	// there's some padding, couldn't figure out the rules for it, so just doing this
-//	header = texture_names_section + texture_names_section_size;
-//
-//	// bone names
-//	uint8* bone_names_section = header;
-//	buffer_skip(&header, bone_names_section_size);
-//
-//	// texture binds (used later)
-//	uint8* texture_binds_section = header;
-//	buffer_skip(&header, texture_binds_section_size);
-//
-//	// geoset header
-//	constexpr uint32 c_name_size = 124;
-//	char name[c_name_size];
-//	buffer_read_bytes(&header, c_name_size, (uint8*)name);
-//
-//	uint32 parent_index = buffer_read_u32(&header);
-//	uint32 u_2 = buffer_read_u32(&header);
-//	uint32 subs_index = buffer_read_u32(&header);
-//	uint32 model_count = buffer_read_u32(&header);
-//
-//	for (uint32 model_i = 0; model_i < model_count; ++model_i)
-//	{
-//		uint32 flags = buffer_read_u32(&header);
-//		float32 radius = buffer_read_f32(&header);
-//		uint32 texture_count = buffer_read_u32(&header);
-//		uint32 texture_binds_offset = buffer_read_u32(&header);
-//		uint32 vertex_count = buffer_read_u32(&header);
-//		uint32 triangle_count = buffer_read_u32(&header);
-//
-//		header += 84;
-//
-//		for (uint32 pack_i = 0; pack_i < 7; ++pack_i)
-//		{
-//			// 0 - triangles
-//			// 1 - vertices
-//			// 2 - normals
-//			// 3 - texcoords
-//			// 4 - weights
-//			// 5 - material indexes
-//			// 6 - grid
-//			uint32 deflated_size = buffer_read_u32(&header);
-//			uint32 inflated_size = buffer_read_u32(&header);
-//			uint32 offset = buffer_read_u32(&header);
-//
-//			if (inflated_size)
-//			{
-//				uint32 start_of_packed_data = file_end_of_header_pos;
-//
-//				switch (pack_i)
-//				{
-//				case 0:
-//				{
-//					uint8* triangle_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					uint32* triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * triangle_count * 3);
-//					geo_unpack_delta_compressed_triangles(triangle_data, triangle_count, /*dst*/triangles);
-//					break;
-//				}
-//
-//				case 1:
-//				{
-//					uint8* vertex_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(vertex_data, vertex_count, /*components_per_item*/ 3, /*dst*/vertices);
-//					break;
-//				}
-//
-//				case 2:
-//				{
-//					uint8* normals_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* normals = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 3);
-//					geo_unpack_delta_compressed_floats(normals_data, vertex_count, /*components_per_item*/ 3, /*dst*/normals);
-//
-//					for (uint32 i = 0; i < vertex_count; ++i)
-//					{
-//						uint32 vertex_start = i * 3;
-//						float x = normals[vertex_start];
-//						float y = normals[vertex_start + 1];
-//						float z = normals[vertex_start + 2];
-//						float length_sq = (x * x) + (y * y) + (z * z);
-//						if (length_sq > 0.0f)
-//						{
-//							float length = sqrt(length_sq);
-//							float inv_length = 1 / length;
-//
-//							x *= inv_length;
-//							y *= inv_length;
-//							z *= inv_length;
-//
-//							normals[vertex_start] = x;
-//							normals[vertex_start + 1] = y;
-//							normals[vertex_start + 2] = z;
-//						}
-//					}
-//					break;
-//				}
-//
-//				case 3:
-//				{
-//					uint8* texcoords_data = debug_read_geo_pack(file, deflated_size, inflated_size, start_of_packed_data + offset, allocator);
-//					float32* texcoords = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * vertex_count * 2);
-//					geo_unpack_delta_compressed_floats(texcoords_data, vertex_count, /*components_per_item*/ 2, /*dst*/texcoords);
-//					break;
-//				}
-//
-//				case 4:
-//					break;
-//
-//				case 5:
-//					break;
-//
-//				case 6:
-//					break;
-//				}
-//			}
-//		}
-//
-//		header += 52;
-//
-//		if (texture_binds_section_size && texture_count)
-//		{
-//			uint8* texture_binds = texture_binds_section + texture_binds_offset;
-//			uint16 texture_index = buffer_read_u16(&texture_binds);
-//			uint16 triangle_count = buffer_read_u16(&texture_binds);
-//		}
-//	}
-//}
-
 void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 {
-	// todo(jbr) just ignore all the fields we don't know or care about for now, just read the stuff that's known, mesh data, and skip the rest for now
 	uint32 header_size = file_read_u32(file);
 
 	// determine version of .geo format
@@ -903,9 +264,8 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	{
 		uint8* model = header;
 
-		uint32	model_flags = *(uint32*)&model[0];
-		float32 model_radius = *(float32*)&model[4];
-
+		uint32	model_flags;
+		float32 model_radius;
 		uint32	model_texture_count;
 		uint32	model_vertex_count;
 		uint32	model_triangle_count;
@@ -922,8 +282,10 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		uint32	deflated_texcoord_data_size;
 		uint32	inflated_texcoord_data_size;
 		uint32	texcoord_data_offset;
-		if (version <= 2)
+		if (version <= 2) // 0, 2
 		{
+			model_flags = *(uint32*)&model[0];
+			model_radius = *(float32*)&model[4];
 			model_texture_count = *(uint32*)&model[12];
 			model_vertex_count = *(uint32*)&model[28];
 			model_triangle_count = *(uint32*)&model[32];
@@ -941,8 +303,10 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			inflated_texcoord_data_size = *(uint32*)&model[172];
 			texcoord_data_offset = *(uint32*)&model[176];
 		}
-		else
+		else if (version <= 7) // 3, 4, 5, 7
 		{
+			model_flags = *(uint32*)&model[0];
+			model_radius = *(float32*)&model[4];
 			model_texture_count = *(uint32*)&model[8];
 			model_vertex_count = *(uint32*)&model[16];
 			model_triangle_count = *(uint32*)&model[20];
@@ -959,6 +323,27 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			deflated_texcoord_data_size = *(uint32*)&model[140];
 			inflated_texcoord_data_size = *(uint32*)&model[144];
 			texcoord_data_offset = *(uint32*)&model[148];
+		}
+		else // 8
+		{
+			model_flags = *(uint32*)&model[0];
+			model_radius = *(float32*)&model[4];
+			model_texture_count = *(uint32*)&model[8];
+			model_vertex_count = *(uint32*)&model[16];
+			model_triangle_count = *(uint32*)&model[20];
+			model_texture_binds_offset = *(uint32*)&model[24];
+			deflated_triangle_data_size = *(uint32*)&model[108];
+			inflated_triangle_data_size = *(uint32*)&model[112];
+			triangle_data_offset = *(uint32*)&model[116];
+			deflated_vertex_data_size = *(uint32*)&model[120];
+			inflated_vertex_data_size = *(uint32*)&model[124];
+			vertex_data_offset = *(uint32*)&model[128];
+			deflated_normal_data_size = *(uint32*)&model[132];
+			inflated_normal_data_size = *(uint32*)&model[136];
+			normal_data_offset = *(uint32*)&model[140];
+			deflated_texcoord_data_size = *(uint32*)&model[144];
+			inflated_texcoord_data_size = *(uint32*)&model[148];
+			texcoord_data_offset = *(uint32*)&model[152];
 		}
 
 		uint32	file_start_of_packed_data_pos = file_end_of_header_pos;
@@ -1018,13 +403,30 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			}
 		}
 
-		if (version <= 2)
+		switch (version)
 		{
+		case 0:
+		case 2:
 			header += 216;
-		}
-		else
-		{
+			break;
+
+		case 3:
+		case 5:
 			header += 208;
+			break;
+
+		case 4:
+		case 7:
+			header += 232;
+			break;
+
+		case 8:
+			header += 240;
+			break;
+
+		default:
+			assert(false);
+			break;
 		}
 	}
 }
