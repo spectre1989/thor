@@ -258,7 +258,6 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 
 	buffer_skip(&header, 12);
 	
-	if (version > 3) return;
 	uint32 geo_model_count = buffer_read_u32(&header);
 	for (uint32 model_i = 0; model_i < geo_model_count; ++model_i)
 	{
@@ -331,7 +330,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			model_texture_count = *(uint32*)&model[8];
 			model_vertex_count = *(uint32*)&model[16];
 			model_triangle_count = *(uint32*)&model[20];
-			model_texture_binds_offset = *(uint32*)&model[24];
+			model_texture_binds_offset = *(uint32*)&model[28];
 			deflated_triangle_data_size = *(uint32*)&model[108];
 			inflated_triangle_data_size = *(uint32*)&model[112];
 			triangle_data_offset = *(uint32*)&model[116];
@@ -356,7 +355,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		float32* vertices = geo_unpack_delta_compressed_floats(file, deflated_vertex_data_size, inflated_vertex_data_size, file_start_of_packed_data_pos + vertex_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
 		float32* normals = geo_unpack_delta_compressed_floats(file, deflated_normal_data_size, inflated_normal_data_size, file_start_of_packed_data_pos + normal_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
 		float32* texcoords = geo_unpack_delta_compressed_floats(file, deflated_texcoord_data_size, inflated_texcoord_data_size, file_start_of_packed_data_pos + texcoord_data_offset, model_vertex_count, /*components_per_item*/2, allocator);
-
+		
 		uint32* triangles_end = triangles + (model_triangle_count * 3);
 		for (uint32* iter = triangles; iter != triangles_end; ++iter)
 		{
@@ -421,7 +420,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			break;
 
 		case 8:
-			header += 240;
+			header += 244;
 			break;
 
 		default:
