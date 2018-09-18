@@ -18,6 +18,7 @@ struct Linear_Allocator
 
 
 void linear_allocator_create(Linear_Allocator* linear_allocator, uint32 size);
+void linear_allocator_destroy(Linear_Allocator* linear_allocator);
 void linear_allocator_reset(Linear_Allocator* linear_allocator);
 uint8* linear_allocator_alloc(Linear_Allocator* linear_allocator, uint32 size);
 bool bytes_equal(const uint8* a, const uint8* b, uint32 byte_count); // todo(jbr) is this the right place for this?

@@ -10,6 +10,12 @@ void linear_allocator_create(Linear_Allocator* linear_allocator, uint32 size)
 	linear_allocator->bytes_available = size;
 }
 
+void linear_allocator_destroy(Linear_Allocator* linear_allocator)
+{
+	delete[] linear_allocator->memory;
+	*linear_allocator = {};
+}
+
 void linear_allocator_reset(Linear_Allocator* linear_allocator)
 {
 	linear_allocator->next = linear_allocator->memory;
