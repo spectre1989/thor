@@ -21,7 +21,7 @@
 |bone_names_section_size|uint32|All|Size of bone_names_section|
 |texture_binds_section_size|uint32|All|Size of texture_binds_section|
 |unknown_section_size|uint32|2,3,4,5|Size of unknown_section|
-|texture_names_section|see below|All|Name of all textures used by this geo|
+|texture_names_section|see below|All|Names of all textures used by this geo|
 |bone_names_section|see below|All|Names of bones in geo|
 |texture_binds_section|see below|All|Information on how textures are applied to geo|
 |unknown_section|see below|2,3,4,5|No idea what this is for, apears in version 2 and disappears after version 5|
@@ -74,7 +74,7 @@ A geo contains one or more models, unsure yet why they're broken down like this,
 |216|216|208|232|208|232|244|
 
 ## Delta Compressed Mesh Data
-Each vertex/triangle/normal/texcoord in delta compressed against the one which came before.
+Each vertex/triangle/normal/texcoord is delta compressed against the one which came before.
 
 |Field|Description|
 |-|-|
