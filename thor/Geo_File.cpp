@@ -201,14 +201,14 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	uint32 texture_names_section_size = buffer_read_u32(&header);
 	uint32 bone_names_section_size = buffer_read_u32(&header);
 	uint32 texture_binds_section_size = buffer_read_u32(&header);
-	uint32 unknown_section_size;
+	uint32 lod_section_size;
 	if (version >= 2 && version <= 5)
 	{
-		unknown_section_size = buffer_read_u32(&header);
+		lod_section_size = buffer_read_u32(&header);
 	}
 	else
 	{
-		unknown_section_size = 0;
+		lod_section_size = 0;
 	}
 
 	// texture names
@@ -238,18 +238,9 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	uint8* texture_binds_section = header;
 	buffer_skip(&header, texture_binds_section_size);
 
-	// unknown section
-	uint8* unknown_section = header;
-	if (unknown_section_size)
-	{
-		uint32 unknown_u32_1 = buffer_read_u32(&header);
-		uint32 unknown_u32_2 = buffer_read_u32(&header);
-		uint32 unknown_u32_3 = buffer_read_u32(&header);
-		float32 unknown_f32_4 = buffer_read_f32(&header);
-		uint32 unknown_u32_5 = buffer_read_u32(&header);
-		float32 unknown_f32_6 = buffer_read_f32(&header);
-	}
-	header = unknown_section + unknown_section_size;
+	// lod section
+	uint8* lod_section = header;
+	header = lod_section + lod_section_size;
 
 	// geoset header
 	constexpr uint32 c_name_size = 124;
@@ -427,5 +418,25 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			assert(false);
 			break;
 		}
+	}
+
+	if (lod_section_size)
+	{
+		header = lod_section;
+		for (uint32 model_i = 0; model_i < geo_model_count; ++model_i)
+		{
+			uint32 used_lod_count = buffer_read_u32(&header);
+			for (uint32 lod_i = 0; lod_i < 6; ++lod_i)
+			{
+				float32 allowed_error = buffer_read_f32(&header);
+				float32 near = buffer_read_f32(&header);
+				float32 far = buffer_read_f32(&header);
+				float32 near_fade = buffer_read_f32(&header);
+				float32 far_fade = buffer_read_f32(&header);
+				uint32 flags = buffer_read_u32(&header);
+			}
+		}
+
+		assert((header - lod_section) <= lod_section_size);
 	}
 }
