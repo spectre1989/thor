@@ -31,13 +31,24 @@
 |models|see below|All|Models which make up this geo|
 
 ## Texture Names Section
-Todo
+|Field|Type|Description|
+|-|-|-|
+|texture_count|uint32|Number of textures in section|
+|texture_name_offsets|uint32[texture_count]|Offset (in bytes) in texture_names section where each texture name starts|
+|texture_names|char[texture_count][]|Null terminated texture name strings|
 
 ## Bone Names Section
 Todo
 
 ## Texture Binds Section
-Todo
+Contains an array of texture binds with the following format
+
+|Field|Type|Description|
+|-|-|-|
+|texture_index|uint16|Index of texture in texture_names_section|
+|triangle_count|uint16|Unsure of the purpose of this yet|
+
+Texture binds are laid out sequentially for every model in the geo, you have to read the texture_binds_offset from each model to figure out which texture binds are for which model.
 
 ## Unknown Section
 This section appears in version 2, and disappears after version 5, unsure of purpose.
@@ -53,7 +64,7 @@ A geo contains one or more models, unsure yet why they're broken down like this,
 |texture_count|12|12|8|8|8|8|8|Suspect number of textures used by model|
 |vertex_count|28|28|16|16|16|16|16|Number of vertices in model|
 |triangle_count|32|32|20|20|20|20|20|Number of triangles in model|
-|texture_binds_offset|36|36|24|24|24|24|28|Offset in texture_binds_section where the texture binds for this model are|
+|texture_binds_offset|36|36|24|24|24|24|28|Offset in texture_binds_section where the texture binds for this model are. The number of texture binds to read will be equal to the texture_count of this model|
 |compressed_triangle_data_size|132|132|104|104|104|104|108|Size of triangle data in file with DEFLATE compression applied|
 |uncompressed_triangle_data_size|136|136|108|108|108|108|112|Size of triangle data in file after decompression|
 |triangle_data_offset|140|140|112|112|112|112|116|Offset in compressed_mesh_data where this data is|
