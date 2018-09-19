@@ -5,6 +5,7 @@
 #include "Pigg_File.h"
 #include "String.h"
 #include <Windows.h>
+#include <vulkan/vulkan.h>
 
 
 
@@ -105,6 +106,45 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 
 		ShowWindow(window_handle, SW_SHOW);
 
+		Linear_Allocator temp_allocator;
+		linear_allocator_create(&temp_allocator, megabytes(32));
+
+		VkApplicationInfo application_info = {};
+		application_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+		application_info.pNext = nullptr;
+		application_info.pApplicationName = "Thor";
+		application_info.applicationVersion = 0;
+		application_info.pEngineName = "Thor";
+		application_info.engineVersion = 0;
+		application_info.apiVersion = VK_API_VERSION_1_1;
+
+		VkInstanceCreateInfo instance_info = {};
+		instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+		instance_info.pNext = nullptr;
+		instance_info.flags = 0;
+		instance_info.pApplicationInfo = &application_info;
+		instance_info.enabledLayerCount = 0;
+		instance_info.ppEnabledLayerNames = nullptr;
+		instance_info.enabledExtensionCount = 0;
+		instance_info.ppEnabledExtensionNames = nullptr;
+
+		VkInstance instance;
+		VkResult result;
+
+		// todo(jbr) add some prerequisites to the repo, like for vk
+		// todo(jbr) validation layers
+		result = vkCreateInstance(&instance_info, /*allocator*/ nullptr, &instance);
+		assert(result == VK_SUCCESS);
+
+		uint32 gpu_count;
+		result = vkEnumeratePhysicalDevices(instance, &gpu_count, /*out_physical_devices*/nullptr);
+		assert(result == VK_SUCCESS);
+		assert(gpu_count);
+
+		VkPhysicalDevice* gpus = (VkPhysicalDevice*)linear_allocator_alloc(&temp_allocator, sizeof(VkPhysicalDevice) * gpu_count);
+		result = vkEnumeratePhysicalDevices(instance, &gpu_count, gpus);
+		assert(result == VK_SUCCESS);
+
 		while (true)
 		{
 			MSG msg;
@@ -114,6 +154,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 				DispatchMessageA(&msg);
 			}
 		}
+
+
 	}
 
 	return 0;
