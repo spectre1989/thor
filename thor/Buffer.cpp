@@ -89,15 +89,15 @@ void buffer_read_bytes(uint8** inout_buffer, uint32 byte_count, uint8* out_bytes
 	*inout_buffer = end;
 }
 
-void buffer_read_string(uint8** inout_buffer, uint32 dst_size /*incl null*/, char* dst)
+void buffer_read_string(uint8** inout_buffer, char* out_string, uint32 max_chars /*incl null*/)
 {
 	uint8* buffer = *inout_buffer;
 
-	uint32 dst_bytes_remaining = dst_size;
+	uint32 out_string_bytes_remaining = max_chars;
 	while (*buffer)
 	{
-		assert(dst_bytes_remaining > 1);
-		if (dst_bytes_remaining == 1)
+		assert(out_string_bytes_remaining > 1);
+		if (out_string_bytes_remaining == 1)
 		{
 			while (*buffer)
 			{
@@ -106,12 +106,12 @@ void buffer_read_string(uint8** inout_buffer, uint32 dst_size /*incl null*/, cha
 			break;
 		}
 
-		*dst = *buffer;
-		++dst;
+		*out_string = *buffer;
+		++out_string;
 		++buffer;
-		--dst_bytes_remaining;
+		--out_string_bytes_remaining;
 	}
-	*dst = 0;
+	*out_string = 0;
 	++buffer;
 
 	*inout_buffer = buffer;

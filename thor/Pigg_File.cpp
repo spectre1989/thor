@@ -123,7 +123,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 			file_read_bytes(file, entry->compressed_size, in_buffer);
 
-			zlib_inflate_bytes(entry->compressed_size, in_buffer, entry->file_size, out_buffer);
+			zlib_inflate_bytes(in_buffer, entry->compressed_size, out_buffer, entry->file_size);
 		}
 
 		assert(entry->string_id < string_count);
@@ -150,6 +150,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 		if (entry->meta_id != c_invalid_id)
 		{
+			// todo(jbr) once meta is documented, stop reading it here and writing to a file
 			string_copy(".meta", &path_buffer[path_buffer_strlen]);
 
 			out_file = file_open_write(path_buffer);
@@ -157,25 +158,26 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 			uint8* meta = packed_meta[entry->meta_id];
 			uint32 meta_size = packed_meta_size[entry->meta_id];
 
-			uint32* meta_file_size = (uint32*)meta;
-			if (*meta_file_size == meta_size)
+			uint32 meta_file_size = *(uint32*)&meta[0];
+			if (meta_file_size == meta_size)
 			{
 				// not compressed
 				file_write_bytes(out_file, meta_size - 4, &meta[4]);
 			}
 			else
 			{
-				assert((*meta_file_size + 4) == meta_size);
-				uint32* compressed_size = (uint32*)&meta[4];
+				assert((meta_file_size + 4) == meta_size);
+				uint32 uncompressed_size = *(uint32*)&meta[4];
 
-				if (!(*compressed_size))
+				if (!uncompressed_size)
 				{
 					// not compressed
 					file_write_bytes(out_file, meta_size - 8, &meta[8]);
 				}
 				else
 				{
-					uint32 bytes_inflated = zlib_inflate_bytes(meta_size - 8, &meta[8], c_out_buffer_size, out_buffer);
+					uint32 bytes_inflated = zlib_inflate_bytes(&meta[8], meta_size - 8, out_buffer, c_out_buffer_size);
+					assert(bytes_inflated == uncompressed_size);
 
 					file_write_bytes(out_file, bytes_inflated, out_buffer);
 				}

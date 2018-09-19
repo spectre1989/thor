@@ -4,7 +4,7 @@
 
 
 
-uint32 zlib_inflate_bytes(uint32 in_bytes_size, uint8* in_bytes, uint32 out_bytes_size, uint8* out_bytes)
+uint32 zlib_inflate_bytes(uint8* deflated_bytes, uint32 deflated_bytes_size, uint8* out_inflated_bytes, uint32 inflated_bytes_size)
 {
 	z_stream zlib_stream;
 	zlib_stream.zalloc = Z_NULL;
@@ -15,15 +15,15 @@ uint32 zlib_inflate_bytes(uint32 in_bytes_size, uint8* in_bytes, uint32 out_byte
 	int zlib_result = inflateInit(&zlib_stream);
 	assert(zlib_result == Z_OK);
 
-	zlib_stream.next_in = in_bytes;
-	zlib_stream.avail_in = in_bytes_size;
-	zlib_stream.next_out = out_bytes;
-	zlib_stream.avail_out = out_bytes_size;
+	zlib_stream.next_in = deflated_bytes;
+	zlib_stream.avail_in = deflated_bytes_size;
+	zlib_stream.next_out = out_inflated_bytes;
+	zlib_stream.avail_out = inflated_bytes_size;
 	zlib_result = inflate(&zlib_stream, Z_NO_FLUSH);
 	assert(zlib_result == Z_STREAM_END);
 	(void)inflateEnd(&zlib_stream);
 
 	assert(zlib_stream.avail_in == 0);
 
-	return out_bytes_size - zlib_stream.avail_out;
+	return inflated_bytes_size - zlib_stream.avail_out;
 }

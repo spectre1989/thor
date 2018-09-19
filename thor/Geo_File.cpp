@@ -17,7 +17,7 @@ static uint8* geo_read_delta_compressed_data_from_file(File_Handle file, uint32 
 	{
 		uint8* deflated = linear_allocator_alloc(allocator, deflated_size);
 		file_read_bytes(file, deflated_size, deflated);
-		zlib_inflate_bytes(deflated_size, deflated, inflated_size, inflated);
+		zlib_inflate_bytes(deflated, deflated_size, inflated, inflated_size);
 	}
 	else
 	{
@@ -188,7 +188,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	file_read_bytes(file, deflated_header_size, deflated_header_bytes);
 	uint32 file_end_of_header_pos = file_get_position(file);
 
-	uint32 bytes_inflated = zlib_inflate_bytes(deflated_header_size, deflated_header_bytes, inflated_header_size, inflated_header_bytes);
+	uint32 bytes_inflated = zlib_inflate_bytes(deflated_header_bytes, deflated_header_size, inflated_header_bytes, inflated_header_size);
 	assert(bytes_inflated == inflated_header_size);
 
 	// I24 contains geos of version 0, 2, 3, 4, 5, 7, 8
@@ -223,7 +223,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	for (uint32 texture_i = 0; texture_i < geo_texture_count; ++texture_i)
 	{
 		char texture_name[512];
-		buffer_read_string(&header, sizeof(texture_name), texture_name);
+		buffer_read_string(&header, texture_name, sizeof(texture_name));
 		int x = 1;
 	}
 

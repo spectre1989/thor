@@ -11,5 +11,5 @@ int32 buffer_read_i32(uint8** inout_buffer);
 float32 buffer_read_f32(uint8** inout_buffer);
 Vec3 buffer_read_vec3(uint8** inout_buffer);
 void buffer_read_bytes(uint8** inout_buffer, uint32 byte_count, uint8* out_bytes);
-void buffer_read_string(uint8** inout_buffer, uint32 dst_size /*incl null*/, char* dst);
+void buffer_read_string(uint8** inout_buffer, char* out_string, uint32 max_chars /*incl null*/);
 void buffer_skip(uint8** inout_buffer, uint32 byte_count);

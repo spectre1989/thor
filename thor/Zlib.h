@@ -4,4 +4,4 @@
 
 
 
-uint32 zlib_inflate_bytes(uint32 in_bytes_size, uint8* in_bytes, uint32 out_bytes_size, uint8* out_bytes);
+uint32 zlib_inflate_bytes(uint8* deflated_bytes, uint32 deflated_bytes_size, uint8* out_inflated_bytes, uint32 inflated_bytes_size);
