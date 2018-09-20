@@ -6,7 +6,7 @@ A Pigg is a collection of individual files, packaged into a single file. Games o
 ## File Layout
 
 |Field|Type|Description|
-|-|-|-|
+|:-|:-|:-|
 |sig|uint32|Always 0x123|
 |unknown|uint16||
 |version|uint16|Suspect this was just used internally by the developers, seems to always be 2|
@@ -20,7 +20,7 @@ A Pigg is a collection of individual files, packaged into a single file. Games o
 ### Internal_File
 
 |Field|Type|Description|
-|-|-|-|
+|:-|:-|:-|
 |sig|uint32|Always 0x3456|
 |name_id|uint32|ID in file_name_table for this file|
 |size|uint32|File size when decompressed|
@@ -36,7 +36,7 @@ A Pigg is a collection of individual files, packaged into a single file. Games o
 Note: Invalid table ID is (uint32)-1.
 
 |Field|Type|Description|
-|-|-|-|
+|:-|:-|:-|
 |sig|uint32|Signature of table, depends on what the table is for|
 |row_count|uint32|Number of rows|
 |size|uint32|Size of table in bytes|
@@ -45,7 +45,7 @@ Note: Invalid table ID is (uint32)-1.
 ### Data_Table_Row
 
 |Field|Type|Description|
-|-|-|-|
+|:-|:-|:-|
 |data_size|uint32|Size of data in bytes|
 |data|uint8[data_size]||
 
@@ -60,7 +60,7 @@ This table will have sig 0x9abc.
 The data in each row has the following layout
 
 |Field|Type|Description|
-|-|-|-|
+|:-|:-|:-|
 |header_size|uint32|If this is equal to the size of the data in this row, then the header data is not compressed, and the rest of the data is the uncompressed header|
 |uncompressed_data|uint8[]|(Only for uncompressed headers)|
 |uncompressed_size|uint32|(Only for compressed headers) Size of header when decompressed|
