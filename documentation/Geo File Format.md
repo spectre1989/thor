@@ -1,4 +1,5 @@
 
+
 # Geo File Format
 
 ## File Layout
@@ -50,39 +51,103 @@ Contains an array of texture binds with the following format
 
 Texture binds are laid out sequentially for every model in the geo, you have to read the texture_binds_offset from each model to figure out which texture binds are for which model.
 
-## Unknown Section
-This section appears in version 2, and disappears after version 5, unsure of purpose.
+## Lod Section
+This section appears in version 2, and disappears after version 5. From version 7 some of this information moved to lods.bin, version 7 and higher can do automatic mesh reduction instead of substituting models.
+|Field|Type|Description|
+|-|-|-|
+|lods|Model_Lods[model_count]|Array of model lods, equal in length to the number of models in the geo.|
+
+#### Model_Lods Structure
+|Field|Type|Description|
+|-|-|-|
+|used_lod_count|uint32|Number of lods this model actually uses, from 1 to 6|
+|lods|Lod[6]|Array of lods, always length of 6 even when fewer are actually used|
+
+#### Lod Structure
+|Field|Type|Description|
+|-|-|-|
+|allowed_error|float32||
+|near|float32|Lod is invisible closer than this distance|
+|far|float32|Lod is invisible farther than this distance|
+|near_fade|float32|Near distance over which the lod is faded|
+|far_fade|float32|Far distance over which the lod is faded|
+|flags|uint32|See below|
+E.g. near=50, far=200, near_fade=25, far_fade=10. Lod will be invisible closer than 50, fade from invisible to fully opaque between 50-75, starts to fade out at 190, fully invisible at 200.
+
+#### Lod Flags
+|Name|Value|Description|
+|-|-|-|
+|ErrorTriCount|0x02|Unknown|  
+|UseFallbackMaterial|0x80|Unknown|
 
 ## Models
 A geo contains one or more models, unsure yet why they're broken down like this, suspect either a) individual models are instanced which come from a particular geo file, or b) a geo is a single object, broken down into models based on material.
 
-|Field|Offset|||||||Description|
-|-|-|-|-|-|-|-|-|-|
-||V0|V2|V3|V4|V5|V7|V8||
-|flags|0|0|0|0|0|0|0|Unsure what different flags mean|
-|radius|4|4|4|4|4|4|4|Suspect this is radius of bounding sphere|
-|texture_count|12|12|8|8|8|8|8|Suspect number of textures used by model|
-|vertex_count|28|28|16|16|16|16|16|Number of vertices in model|
-|triangle_count|32|32|20|20|20|20|20|Number of triangles in model|
-|texture_binds_offset|36|36|24|24|24|24|28|Offset in texture_binds_section where the texture binds for this model are. The number of texture binds to read will be equal to the texture_count of this model|
-|compressed_triangle_data_size|132|132|104|104|104|104|108|Size of triangle data in file with DEFLATE compression applied|
-|uncompressed_triangle_data_size|136|136|108|108|108|108|112|Size of triangle data in file after decompression|
-|triangle_data_offset|140|140|112|112|112|112|116|Offset in compressed_mesh_data where this data is|
-|compressed_vertex_data_size|144|144|116|116|116|116|120|Size of vertex data in file with DEFLATE compression applied|
-|uncompressed_vertex_data_size|148|148|120|120|120|120|124|Size of vertex data in file after decompression|
-|vertex_data_offset|152|152|124|124|124|124|128|Offset in compressed_mesh_data where this data is|
-|compressed_normal_data_size|156|156|128|128|128|128|132|Size of vertex normal data in file with DEFLATE compression applied|
-|uncompressed_normal_data_size|160|160|132|132|132|132|136|Size of vertex normal data in file after decompression|
-|normal_data_offset|164|164|136|136|136|136|140|Offset in compressed_mesh_data where this data is - vertex normals may not be normalised|
-|compressed_texcoord_data_size|168|168|140|140|140|140|144|Size of texcoord data in file with DEFLATE compression applied|
-|uncompressed_texcoord_data_size|172|172|144|144|144|144|148|Size of texcoord data in file after decompression|
-|texcoord_data_offset|176|176|148|148|148|148|152|Offset in compressed_mesh_data where this data is|
+|Field|Type|Offset|||||||Description|
+|-|-|-|-|-|-|-|-|-|-|
+|||V0|V2|V3|V4|V5|V7|V8||
+|flags|uint32|0|0|0|0|0|0|0|See model flags below|
+|radius|float32|4|4|4|4|4|4|4|Suspect this is radius of bounding sphere|
+|texture_count|uint32|12|12|8|8|8|8|8|Suspect number of textures used by model|
+|id|uint16|16|?|?|?|?|?|?|Not used by client|
+|blend_mode|uint8|18|?|?|?|?|?|?|See blend modes below|
+|unused_during_load|uint8|19|?|?|?|?|?|?|Used by client to mark loaded state of model|
+|vertex_count|uint32|28|28|16|16|16|16|16|Number of vertices in model|
+|triangle_count|uint32|32|32|20|20|20|20|20|Number of triangles in model|
+|texture_binds_offset|uint32|36|36|24|24|24|24|28|Offset in texture_binds_section where the texture binds for this model are. The number of texture binds to read will be equal to the texture_count of this model|
+|grid_pos|vector3|44|?|?|?|?|?|?|Used for collision detection, unsure how|
+|grid_size|float32|56|?|?|?|?|?|?|Used for collision detection, unsure how|
+|grid_inv_size|float32|60|?|?|?|?|?|?|Used for collision detection, unsure how|
+|grid_tag|uint32|64|?|?|?|?|?|?|Used for collision detection, unsure how|
+|grid_num_bits|uint32|68|?|?|?|?|?|?|Used for collision detection, unsure how|
+|compressed_triangle_data_size|uint32|132|132|104|104|104|104|108|Size of triangle data in file with DEFLATE compression applied|
+|uncompressed_triangle_data_size|uint32|136|136|108|108|108|108|112|Size of triangle data in file after decompression|
+|triangle_data_offset|uint32|140|140|112|112|112|112|116|Offset in compressed_mesh_data where this data is|
+|compressed_vertex_data_size|uint32|144|144|116|116|116|116|120|Size of vertex data in file with DEFLATE compression applied|
+|uncompressed_vertex_data_size|uint32|148|148|120|120|120|120|124|Size of vertex data in file after decompression|
+|vertex_data_offset|uint32|152|152|124|124|124|124|128|Offset in compressed_mesh_data where this data is|
+|compressed_normal_data_size|uint32|156|156|128|128|128|128|132|Size of vertex normal data in file with DEFLATE compression applied|
+|uncompressed_normal_data_size|uint32|160|160|132|132|132|132|136|Size of vertex normal data in file after decompression|
+|normal_data_offset|uint32|164|164|136|136|136|136|140|Offset in compressed_mesh_data where this data is - vertex normals may not be normalised|
+|compressed_texcoord_data_size|uint32|168|168|140|140|140|140|144|Size of texcoord data in file with DEFLATE compression applied|
+|uncompressed_texcoord_data_size|uint32|172|172|144|144|144|144|148|Size of texcoord data in file after decompression|
+|texcoord_data_offset|uint32|176|176|148|148|148|148|152|Offset in compressed_mesh_data where this data is|
 
 #### Total Size Per Model
 
 |V0|V2|V3|V4|V5|V7|V8|
 |-|-|-|-|-|-|-|
 |216|216|208|232|208|232|244|
+
+#### Model Flags
+|Name|Value|Description
+|-|-|-|
+|alpha_sort|0x1||
+|full_bright|0x4||
+|no_light_angle|0x10||
+|dual_texture|0x40||
+|lod|0x80||
+|tree|0x100||
+|dual_tex_normal|0x200||
+|force_opaque|0x400||
+|bump_map|0x800||
+|world_fx|0x1000||
+|cube_map|0x2000||
+|draw_as_ent|0x4000||
+|static_fx|0x8000||
+|hide|0x10000||
+
+#### Blend Modes
+|Name|Value|Description|
+|-|-|-|
+|multiply|0||
+|multiply_reg|1||
+|color_blend_dual|2||
+|add_glow|3||
+|alpha_detail|4||
+|bump_map_multiply|5||
+|bump_map_color_blend_dual|6||
+|invalid|255||
 
 ## Delta Compressed Mesh Data
 Each vertex/triangle/normal/texcoord is delta compressed against the one which came before.
@@ -161,3 +226,4 @@ for (item_i = 0; item_i < item_count; ++item_i)
 	previous = current;
 }
 ```
+#### Thanks to CodeWalker and Nemerle for providing further information and corrections
