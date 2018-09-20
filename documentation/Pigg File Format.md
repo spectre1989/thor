@@ -64,4 +64,4 @@ The data in each row has the following layout
 |header_size|uint32|If this is equal to the size of the data in this row, then the header data is not compressed, and the rest of the data is the uncompressed header|
 |uncompressed_data|uint8[]|(Only for uncompressed headers)|
 |uncompressed_size|uint32|(Only for compressed headers) Size of header when decompressed|
-|compressed_data|uint8[]|(Only for compressed headers)|
+|compressed_data|uint8[]|(Only for compressed headers) Note, in some cases uncompressed_size is 0, which means that this data is not actually compressed after all|
