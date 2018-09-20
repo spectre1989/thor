@@ -81,22 +81,29 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 	uint32 meta_count = file_read_u32(file);
 	table_size = file_read_u32(file);
 
-	uint8** packed_meta = (uint8**)linear_allocator_alloc(allocator, sizeof(uint8*) * meta_count); // todo(jbr) should these two tables be read in a generic way?
-	uint32* packed_meta_size = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * meta_count);
-	uint32 total_packed_meta_size = table_size - (meta_count * 4);
-	uint8* packed_meta_data = (uint8*)linear_allocator_alloc(allocator, sizeof(uint8) * total_packed_meta_size);
+	uint8** packed_meta = nullptr;
+	uint32* packed_meta_size = nullptr;
+	
 	num_table_bytes_read = 0;
 
-	for (uint32 i = 0; i < meta_count; ++i)
+	if (table_size)
 	{
-		packed_meta_size[i] = file_read_u32(file);
-		assert(packed_meta_size[i] <= (total_packed_meta_size - num_table_bytes_read));
+		uint32 total_packed_meta_size = table_size - (meta_count * 4);
+		packed_meta = (uint8**)linear_allocator_alloc(allocator, sizeof(uint8*) * meta_count); // todo(jbr) should these two tables be read in a generic way?
+		packed_meta_size = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * meta_count);
+		uint8* packed_meta_data = (uint8*)linear_allocator_alloc(allocator, sizeof(uint8) * total_packed_meta_size);
 
-		file_read_bytes(file, packed_meta_size[i], &packed_meta_data[num_table_bytes_read]);
+		for (uint32 i = 0; i < meta_count; ++i)
+		{
+			packed_meta_size[i] = file_read_u32(file);
+			assert(packed_meta_size[i] <= (total_packed_meta_size - num_table_bytes_read));
 
-		packed_meta[i] = &packed_meta_data[num_table_bytes_read];
+			file_read_bytes(file, packed_meta_size[i], &packed_meta_data[num_table_bytes_read]);
 
-		num_table_bytes_read += packed_meta_size[i];
+			packed_meta[i] = &packed_meta_data[num_table_bytes_read];
+
+			num_table_bytes_read += packed_meta_size[i];
+		}
 	}
 
 	constexpr uint32 c_in_buffer_size = megabytes(8);

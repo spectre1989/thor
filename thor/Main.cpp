@@ -131,7 +131,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 		VkInstance instance;
 		VkResult result;
 
-		// todo(jbr) add some prerequisites to the repo, like for vk
 		// todo(jbr) validation layers
 		result = vkCreateInstance(&instance_info, /*allocator*/ nullptr, &instance);
 		assert(result == VK_SUCCESS);
@@ -145,6 +144,27 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 		result = vkEnumeratePhysicalDevices(instance, &gpu_count, gpus);
 		assert(result == VK_SUCCESS);
 
+		// for now just try to pick a dedicated gpu if available
+		// todo(jbr) properly examine gpus and decide on best one
+		VkPhysicalDevice gpu = nullptr;
+		for (uint32 i = 0; i < gpu_count; ++i)
+		{
+			VkPhysicalDeviceProperties gpu_properties;
+			vkGetPhysicalDeviceProperties(gpus[i], &gpu_properties);
+
+			if (gpu_properties.deviceType == VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+			{
+				gpu = gpus[i];
+				break;
+			}
+		}
+		if (!gpu)
+		{
+			gpu = gpus[0];
+		}
+		
+
+
 		while (true)
 		{
 			MSG msg;
@@ -154,8 +174,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 				DispatchMessageA(&msg);
 			}
 		}
-
-
 	}
 
 	return 0;
