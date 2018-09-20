@@ -6,7 +6,7 @@
 
 |Field|Type|Versions|Description|
 |-|-|-|-|
-|header_size|uint32|All|The overall size of the header (excl this field)
+|header_size|uint32|All|The overall size of the header (excl this field)|
 |zero|uint32|2+|Used in versions newer than 0 to indicate that a version number will follow this field|
 |version|uint32|2+|Version of this geo, data layout differs between versions|
 |uncompressed_header_data_size|uint32|All|The size of compressed_header_data when it has been decompressed|
@@ -39,9 +39,11 @@
 |texture_names|char[texture_count][]|Null terminated texture name strings|
 
 ## Bone Names Section
+
 Todo
 
 ## Texture Binds Section
+
 Contains an array of texture binds with the following format
 
 |Field|Type|Description|
@@ -52,18 +54,22 @@ Contains an array of texture binds with the following format
 Texture binds are laid out sequentially for every model in the geo, you have to read the texture_binds_offset from each model to figure out which texture binds are for which model.
 
 ## Lod Section
+
 This section appears in version 2, and disappears after version 5. From version 7 some of this information moved to lods.bin, version 7 and higher can do automatic mesh reduction instead of substituting models.
+
 |Field|Type|Description|
 |-|-|-|
-|lods|Model_Lods[model_count]|Array of model lods, equal in length to the number of models in the geo.|
+|lods|Model_Lods[model_count]|Array of model lods, equal in length to the number of models in the geo|
 
 #### Model_Lods Structure
+
 |Field|Type|Description|
 |-|-|-|
 |used_lod_count|uint32|Number of lods this model actually uses, from 1 to 6|
 |lods|Lod[6]|Array of lods, always length of 6 even when fewer are actually used|
 
 #### Lod Structure
+
 |Field|Type|Description|
 |-|-|-|
 |allowed_error|float32||
@@ -72,15 +78,18 @@ This section appears in version 2, and disappears after version 5. From version 
 |near_fade|float32|Near distance over which the lod is faded|
 |far_fade|float32|Far distance over which the lod is faded|
 |flags|uint32|See below|
+
 E.g. near=50, far=200, near_fade=25, far_fade=10. Lod will be invisible closer than 50, fade from invisible to fully opaque between 50-75, starts to fade out at 190, fully invisible at 200.
 
 #### Lod Flags
+
 |Name|Value|Description|
 |-|-|-|
 |ErrorTriCount|0x02|Unknown|  
 |UseFallbackMaterial|0x80|Unknown|
 
 ## Models
+
 A geo contains one or more models, unsure yet why they're broken down like this, suspect either a) individual models are instanced which come from a particular geo file, or b) a geo is a single object, broken down into models based on material.
 
 |Field|Type|Offset|||||||Description|
@@ -120,7 +129,7 @@ A geo contains one or more models, unsure yet why they're broken down like this,
 |216|216|208|232|208|232|244|
 
 #### Model Flags
-|Name|Value|Description
+|Name|Value|Description|
 |-|-|-|
 |alpha_sort|0x1||
 |full_bright|0x4||
