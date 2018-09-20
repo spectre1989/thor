@@ -12,6 +12,11 @@ Skilled reverse engineers are harder to find than programmers, the hope is to co
 
 Making something playable which is CoH themed, such as a map viewer or hero creator
 
+### Building Thor
+
+* Visual Studio 2017
+* Vulkan SDK
+
 
 ### Thanks
 Most of what I've written down about file formats etc for CoH were figured out by other people  
