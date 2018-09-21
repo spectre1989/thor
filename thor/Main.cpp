@@ -6,6 +6,7 @@
 #include "String.h"
 #include <Windows.h>
 #include <vulkan/vulkan.h>
+#include <cstdio>
 
 
 
@@ -32,6 +33,24 @@ static void on_geo_file_found(const char* path, void* state)
 	File_Handle geo_file = file_open_read(path);
 	geo_file_check(geo_file, allocator);
 	file_close(geo_file);
+}
+
+static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
+    VkDebugReportFlagsEXT                       flags,
+    VkDebugReportObjectTypeEXT                  object_type,
+    uint64_t                                    object,
+    size_t                                      location,
+    int32_t                                     message_code,
+    const char*                                 layer_prefix,
+    const char*                                 message,
+    void*                                       user_data)
+{
+	char buffer[512];
+	int32 message_length = snprintf(buffer, sizeof(buffer), "[%s]%s\n", layer_prefix, message);
+	assert(message_length < sizeof(buffer));
+	OutputDebugStringA(buffer);
+
+	return VK_FALSE; // the caller shouldn't abort
 }
 
 static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_param, LPARAM l_param)
@@ -125,15 +144,31 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 		instance_info.pApplicationInfo = &application_info;
 		instance_info.enabledLayerCount = 0;
 		instance_info.ppEnabledLayerNames = nullptr;
-		instance_info.enabledExtensionCount = 0;
-		instance_info.ppEnabledExtensionNames = nullptr;
+		const char* enabled_extension_names[] = {VK_EXT_DEBUG_REPORT_EXTENSION_NAME};
+		instance_info.enabledExtensionCount = sizeof(enabled_extension_names) / sizeof(enabled_extension_names[0]);
+		instance_info.ppEnabledExtensionNames = enabled_extension_names;
 
 		VkInstance instance;
 		VkResult result;
 
-		// todo(jbr) validation layers
 		result = vkCreateInstance(&instance_info, /*allocator*/ nullptr, &instance);
 		assert(result == VK_SUCCESS);
+
+		VkDebugReportCallbackCreateInfoEXT debug_callbacks_info = {};
+		debug_callbacks_info.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+		debug_callbacks_info.pNext = nullptr;
+		debug_callbacks_info.flags = VK_DEBUG_REPORT_INFORMATION_BIT_EXT |
+									VK_DEBUG_REPORT_WARNING_BIT_EXT |
+									VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+									VK_DEBUG_REPORT_ERROR_BIT_EXT |
+									VK_DEBUG_REPORT_DEBUG_BIT_EXT;
+		debug_callbacks_info.pfnCallback = vulkan_debug_callback;
+		debug_callbacks_info.pUserData = nullptr;
+
+		// todo(jbr) define out callbacks in release
+		VkDebugReportCallbackEXT debug_callbacks;
+		PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+		vkCreateDebugReportCallbackEXT(instance, &debug_callbacks_info, /*allocator*/ nullptr, &debug_callbacks);
 
 		uint32 gpu_count;
 		result = vkEnumeratePhysicalDevices(instance, &gpu_count, /*out_physical_devices*/nullptr);
