@@ -31,6 +31,9 @@ void bin_file_check(File_Handle file)
 	assert(string_equals(buffer, "Files1"));
 
 	// These files are a list of text files used to create this bin (not useful)
+	/*
+	commenting this out to suppress warnings, document bin files and then get rid of this checking stuff
+
 	uint32 files_section_size = file_read_u32(file);
 	uint32 file_count = file_read_u32(file);
 	for (uint32 i = 0; i < file_count; ++i)
@@ -39,7 +42,7 @@ void bin_file_check(File_Handle file)
 		uint32 timestamp = file_read_u32(file);				// timestamp
 	}
 
-	uint32 data_size = file_read_u32(file);
+	uint32 data_size = file_read_u32(file);*/
 
 	switch (bin_type_id)
 	{
@@ -62,8 +65,8 @@ void bin_file_check(File_Handle file)
 }
 
 void bin_file_check_geobin(File_Handle file)
-{
-	uint32 version = file_read_u32(file);
+{// todo(jbr)
+	//uint32 version = file_read_u32(file);
 	char buffer[512];
 	bin_file_read_string(file, sizeof(buffer), buffer); // scene file
 	bin_file_read_string(file, sizeof(buffer), buffer); // loading screen
@@ -71,7 +74,7 @@ void bin_file_check_geobin(File_Handle file)
 	uint32 def_count = file_read_u32(file);
 	for (uint32 def_i = 0; def_i < def_count; ++def_i)
 	{
-		uint32 def_size = file_read_u32(file);
+		//uint32 def_size = file_read_u32(file);
 
 		bin_file_read_string(file, sizeof(buffer), buffer); // name
 
@@ -84,7 +87,7 @@ void bin_file_check_geobin(File_Handle file)
 			bin_file_read_string(file, sizeof(buffer), buffer); // name
 			Vec3 pos = file_read_vec3(file);
 			Vec3 rot = file_read_vec3(file);
-			uint32 flags = file_read_u32(file);
+			//uint32 flags = file_read_u32(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -97,7 +100,7 @@ void bin_file_check_geobin(File_Handle file)
 
 			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
 			bin_file_read_string(file, sizeof(buffer), buffer);
-			uint32 u32 = file_read_u32(file);
+			//uint32 u32 = file_read_u32(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -108,8 +111,8 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			uint32 col_1 = bin_file_read_color(file);	// todo(jbr) what are these?
-			uint32 col_2 = bin_file_read_color(file);
+			//uint32 col_1 = bin_file_read_color(file);	// todo(jbr) what are these?
+			//uint32 col_2 = bin_file_read_color(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -120,7 +123,7 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			uint32 color = bin_file_read_color(file);
+			//uint32 color = bin_file_read_color(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -131,9 +134,9 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			uint32 color = bin_file_read_color(file);
-			float32 f32 = file_read_f32(file); // todo(jbr) what are these?
-			uint32 flags = file_read_u32(file); // todo(jbr) document all the flags
+			//uint32 color = bin_file_read_color(file);
+			//float32 f32 = file_read_f32(file); // todo(jbr) what are these?
+			//uint32 flags = file_read_u32(file); // todo(jbr) document all the flags
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -144,10 +147,10 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			uint32 u_1 = file_read_u32(file); // todo(jbr) what are these? default = 256
-			uint32 u_2 = file_read_u32(file); // default = 1024
-			float32 f_1 = file_read_f32(file);
-			float32 f_2 = file_read_f32(file);	// default = 12
+			//uint32 u_1 = file_read_u32(file); // todo(jbr) what are these? default = 256
+			//uint32 u_2 = file_read_u32(file); // default = 1024
+			//float32 f_1 = file_read_f32(file);
+			//float32 f_2 = file_read_f32(file);	// default = 12
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -158,9 +161,9 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			float32 f_1 = file_read_f32(file); // todo(jbr) what are these? width/height/depth?
-			float32 f_2 = file_read_f32(file);
-			float32 f_3 = file_read_f32(file);
+			//float32 f_1 = file_read_f32(file); // todo(jbr) what are these? width/height/depth?
+			//float32 f_2 = file_read_f32(file);
+			//float32 f_3 = file_read_f32(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -172,10 +175,10 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 start = file_get_position(file);
 
 			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
-			float32 f_1 = file_read_f32(file);
-			float32 f_2 = file_read_f32(file);
-			float32 f_3 = file_read_f32(file);
-			uint32 flags = file_read_u32(file); // 1 = exclude
+			//float32 f_1 = file_read_f32(file);
+			//float32 f_2 = file_read_f32(file);
+			//float32 f_3 = file_read_f32(file);
+			//uint32 flags = file_read_u32(file); // 1 = exclude
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -186,7 +189,7 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			uint32 u32 = file_read_u32(file);						// tex_unit
+			//uint32 u32 = file_read_u32(file);						// tex_unit
 			bin_file_read_string(file, sizeof(buffer), buffer);		// tex_name
 
 			assert((file_get_position(file) - start) == size);
@@ -199,7 +202,7 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 start = file_get_position(file);
 
 			bin_file_read_string(file, sizeof(buffer), buffer); // name
-			float32 f32 = file_read_f32(file);					// radius
+			//float32 f32 = file_read_f32(file);					// radius
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -211,12 +214,12 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 start = file_get_position(file);
 
 			// todo(jbr) what are these, maybe radius, near, far, colours, f_4?
-			float32 f_1 = file_read_f32(file);
-			float32 f_2 = file_read_f32(file);
-			float32 f_3 = file_read_f32(file);
-			uint32 col_1 = bin_file_read_color(file);
-			uint32 col_2 = bin_file_read_color(file);
-			float32 f_4 = file_read_f32(file); // todo(jbr) document all defaults // default = 1
+			//float32 f_1 = file_read_f32(file);
+			//float32 f_2 = file_read_f32(file);
+			//float32 f_3 = file_read_f32(file);
+			//uint32 col_1 = bin_file_read_color(file);
+			//uint32 col_2 = bin_file_read_color(file);
+			//float32 f_4 = file_read_f32(file); // todo(jbr) document all defaults // default = 1
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -227,16 +230,16 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 size = file_read_u32(file);
 			uint32 start = file_get_position(file);
 
-			float32 lod_far = file_read_f32(file);
-			float32 lod_far_fade = file_read_f32(file);
-			float32 lod_scale = file_read_f32(file);
+			//float32 lod_far = file_read_f32(file);
+			//float32 lod_far_fade = file_read_f32(file);
+			//float32 lod_scale = file_read_f32(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
 
 		bin_file_read_string(file, sizeof(buffer), buffer); // "Type"
-		uint32 flags = file_read_u32(file);
-		float32 alpha = file_read_f32(file);
+		//uint32 flags = file_read_u32(file);
+		//float32 alpha = file_read_f32(file);
 		bin_file_read_string(file, sizeof(buffer), buffer); // "Obj"
 
 		uint32 tex_swap_count = file_read_u32(file);
@@ -247,7 +250,7 @@ void bin_file_check_geobin(File_Handle file)
 
 			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
 			bin_file_read_string(file, sizeof(buffer), buffer);
-			uint32 u32 = file_read_u32(file);
+			//uint32 u32 = file_read_u32(file);
 
 			assert((file_get_position(file) - start) == size);
 		}
@@ -262,8 +265,8 @@ void bin_file_check_geobin(File_Handle file)
 		uint32 start = file_get_position(file);
 
 		bin_file_read_string(file, sizeof(buffer), buffer); // name
-		Vec3 pos = file_read_vec3(file);
-		Vec3 rot = file_read_vec3(file);
+		//Vec3 pos = file_read_vec3(file);
+		//Vec3 rot = file_read_vec3(file);
 
 		assert((file_get_position(file) - start) == size);
 	}
@@ -307,15 +310,15 @@ void bin_file_check_bounds(File_Handle file)
 		uint32 start = file_get_position(file);
 
 		bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
-		Vec3 min = file_read_vec3(file); // min
-		Vec3 max = file_read_vec3(file); // max
-		Vec3 v_3 = file_read_vec3(file);
-		float f_1 = file_read_f32(file);
-		float radius = file_read_f32(file); // radius of a sphere which contains the cube
-		float f_2 = file_read_f32(file);
-		uint32 u_1 = file_read_u32(file);
-		uint32 u_2 = file_read_u32(file);
-		uint32 flags = file_read_u32(file);
+		//Vec3 min = file_read_vec3(file); // min
+		//Vec3 max = file_read_vec3(file); // max
+		//Vec3 v_3 = file_read_vec3(file);
+		//float f_1 = file_read_f32(file);
+		//float radius = file_read_f32(file); // radius of a sphere which contains the cube
+		//float f_2 = file_read_f32(file);
+		//uint32 u_1 = file_read_u32(file);
+		//uint32 u_2 = file_read_u32(file);
+		//uint32 flags = file_read_u32(file);
 		// 0x2000000 visible only to developers
 		// 0x800000 no collision
 

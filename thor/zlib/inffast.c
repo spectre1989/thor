@@ -47,6 +47,8 @@
       requires strm->avail_out >= 258 for each loop to avoid checking for
       output space.
  */
+#pragma warning(push)
+#pragma warning(disable:4131)
 void ZLIB_INTERNAL inflate_fast(strm, start)
 z_streamp strm;
 unsigned start;         /* inflate()'s starting value for strm->avail_out */
@@ -319,5 +321,5 @@ unsigned start;         /* inflate()'s starting value for strm->avail_out */
    - Larger unrolled copy loops (three is about right)
    - Moving len -= 3 statement into middle of loop
  */
-
+#pragma warning(pop)
 #endif /* !ASMINF */

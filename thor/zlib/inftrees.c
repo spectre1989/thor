@@ -29,6 +29,8 @@ const char inflate_copyright[] =
    table index bits.  It will differ if the request is greater than the
    longest code or if it is less than the shortest code.
  */
+#pragma warning(push)
+#pragma warning(disable:4131)
 int ZLIB_INTERNAL inflate_table(type, lens, codes, table, bits, work)
 codetype type;
 unsigned short FAR *lens;
@@ -302,3 +304,4 @@ unsigned short FAR *work;
     *bits = root;
     return 0;
 }
+#pragma warning(pop)

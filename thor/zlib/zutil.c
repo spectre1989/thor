@@ -4,7 +4,8 @@
  */
 
 /* @(#) $Id$ */
-
+#pragma warning(push)
+#pragma warning(disable:4131)
 #include "zutil.h"
 #ifndef Z_SOLO
 #  include "gzguts.h"
@@ -323,3 +324,4 @@ void ZLIB_INTERNAL zcfree (opaque, ptr)
 #endif /* MY_ZCALLOC */
 
 #endif /* !Z_SOLO */
+#pragma warning(pop)

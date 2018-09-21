@@ -59,6 +59,9 @@ local uLong adler32_combine_ OF((uLong adler1, uLong adler2, z_off64_t len2));
 #  define MOD63(a) a %= BASE
 #endif
 
+#pragma warning(push)
+#pragma warning(disable:4131)
+
 /* ========================================================================= */
 uLong ZEXPORT adler32_z(adler, buf, len)
     uLong adler;
@@ -184,3 +187,5 @@ uLong ZEXPORT adler32_combine64(adler1, adler2, len2)
 {
     return adler32_combine_(adler1, adler2, len2);
 }
+
+#pragma warning(pop)

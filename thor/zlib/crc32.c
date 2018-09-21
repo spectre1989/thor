@@ -198,6 +198,10 @@ const z_crc_t FAR * ZEXPORT get_crc_table()
 #define DO1 crc = crc_table[0][((int)crc ^ (*buf++)) & 0xff] ^ (crc >> 8)
 #define DO8 DO1; DO1; DO1; DO1; DO1; DO1; DO1; DO1
 
+#pragma warning(push)
+#pragma warning(disable:4131)
+#pragma warning(disable:4127)
+
 /* ========================================================================= */
 unsigned long ZEXPORT crc32_z(crc, buf, len)
     unsigned long crc;
@@ -440,3 +444,5 @@ uLong ZEXPORT crc32_combine64(crc1, crc2, len2)
 {
     return crc32_combine_(crc1, crc2, len2);
 }
+
+#pragma warning(pop)

@@ -101,7 +101,8 @@ local int updatewindow OF((z_streamp strm, const unsigned char FAR *end,
 #endif
 local unsigned syncsearch OF((unsigned FAR *have, const unsigned char FAR *buf,
                               unsigned len));
-
+#pragma warning(push)
+#pragma warning(disable:4131)
 local int inflateStateCheck(strm)
 z_streamp strm;
 {
@@ -1559,3 +1560,4 @@ z_streamp strm;
     state = (struct inflate_state FAR *)strm->state;
     return (unsigned long)(state->next - state->codes);
 }
+#pragma warning(pop)
