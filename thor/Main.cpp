@@ -18,7 +18,7 @@ static void on_pigg_file_found(const char* path, void* state)
 	unpack_pigg_file(path, allocator);
 }
 
-static void on_bin_file_found(const char* path, void* state)
+static void on_bin_file_found(const char* path, void* /*state*/)
 {
 	File_Handle bin_file = file_open_read(path);
 	bin_file_check(bin_file);
@@ -36,14 +36,14 @@ static void on_geo_file_found(const char* path, void* state)
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
-    VkDebugReportFlagsEXT                       flags,
-    VkDebugReportObjectTypeEXT                  object_type,
-    uint64_t                                    object,
-    size_t                                      location,
-    int32_t                                     message_code,
+    VkDebugReportFlagsEXT                       /*flags*/,
+    VkDebugReportObjectTypeEXT                  /*object_type*/,
+    uint64_t                                    /*object*/,
+    size_t                                      /*location*/,
+    int32_t                                     /*message_code*/,
     const char*                                 layer_prefix,
     const char*                                 message,
-    void*                                       user_data)
+    void*                                       /*user_data*/)
 {
 	char buffer[512];
 	int32 message_length = snprintf(buffer, sizeof(buffer), "[%s]%s\n", layer_prefix, message);
@@ -58,7 +58,7 @@ static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_p
 	return DefWindowProcA(window_handle, msg, w_param, l_param);
 }
 
-int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
+int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle*/, LPSTR cmd_line, int /*cmd_show*/)
 {
 	bool unpack_piggs = false;
 	bool check_bins = false;
@@ -100,7 +100,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 		window_class.lpfnWndProc = window_callback;
 		window_class.cbClsExtra = 0;
 		window_class.cbWndExtra = 0;
-		window_class.hInstance = instance;
+		window_class.hInstance = instance_handle;
 		window_class.hIcon = nullptr;
 		window_class.hCursor = nullptr;
 		window_class.hbrBackground = nullptr;
@@ -119,7 +119,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 		   800,					// nHeight
 		   nullptr,				// hWndParent
 		   nullptr,				// hMenu
-		   instance,
+		   instance_handle,
 		   nullptr				// lpParam
 		);
 
@@ -144,9 +144,9 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 		instance_info.pApplicationInfo = &application_info;
 		instance_info.enabledLayerCount = 0;
 		instance_info.ppEnabledLayerNames = nullptr;
-		const char* enabled_extension_names[] = {VK_EXT_DEBUG_REPORT_EXTENSION_NAME};
-		instance_info.enabledExtensionCount = sizeof(enabled_extension_names) / sizeof(enabled_extension_names[0]);
-		instance_info.ppEnabledExtensionNames = enabled_extension_names;
+		const char* enabled_instance_extension_names[] = { VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_EXTENSION_NAME };
+		instance_info.enabledExtensionCount = sizeof(enabled_instance_extension_names) / sizeof(enabled_instance_extension_names[0]);
+		instance_info.ppEnabledExtensionNames = enabled_instance_extension_names;
 
 		VkInstance instance;
 		VkResult result;
@@ -198,7 +198,90 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 			gpu = gpus[0];
 		}
 		
+		uint32 queue_family_count;
+		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_family_count, /*queue_families*/ nullptr);
 
+		VkQueueFamilyProperties* queue_families = (VkQueueFamilyProperties*)linear_allocator_alloc(&temp_allocator, sizeof(VkQueueFamilyProperties) * queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_family_count, queue_families);
+
+		uint32 chosen_queue_family_index = (uint32)-1;
+		for (uint32 i = 0; i < queue_family_count; ++i)
+		{
+			if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			{
+				chosen_queue_family_index = i;
+				break;
+			}
+		}
+		assert(chosen_queue_family_index != (uint32)-1);
+
+		VkDeviceQueueCreateInfo queue_create_info = {};
+		queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queue_create_info.pNext = nullptr;
+		queue_create_info.flags = 0;
+		queue_create_info.queueFamilyIndex = chosen_queue_family_index;
+		queue_create_info.queueCount = 1;
+		float32 queue_priority = 1.0f;
+		queue_create_info.pQueuePriorities = &queue_priority;
+
+		VkDeviceCreateInfo device_info = {};
+		device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+		device_info.pNext = nullptr;
+		device_info.flags = 0;
+		device_info.queueCreateInfoCount = 1;
+		device_info.pQueueCreateInfos = &queue_create_info;
+		device_info.enabledLayerCount = 0;
+		device_info.ppEnabledLayerNames = nullptr;
+		const char* enabled_device_extension_names[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+		device_info.enabledExtensionCount = sizeof(enabled_device_extension_names) / sizeof(enabled_device_extension_names[0]);
+		device_info.ppEnabledExtensionNames = enabled_device_extension_names;
+		device_info.pEnabledFeatures = nullptr;
+
+		VkDevice device;
+		result = vkCreateDevice(gpu, &device_info, /*allocator*/ nullptr, &device);
+		assert(result == VK_SUCCESS);
+
+		VkWin32SurfaceCreateInfoKHR surface_info = {};
+		surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		surface_info.pNext = nullptr;
+		surface_info.flags = 0;
+		surface_info.hinstance = instance_handle;
+		surface_info.hwnd = window_handle;
+
+		VkSurfaceKHR surface;
+		result = vkCreateWin32SurfaceKHR(instance, &surface_info, /*allocator*/ nullptr, &surface);
+		assert(result == VK_SUCCESS);
+
+		VkSwapchainCreateInfoKHR swapchain_info = {};
+		swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		swapchain_info.pNext = nullptr;
+		swapchain_info.flags = 0;
+		swapchain_info.surface = surface;
+
+		/*typedef struct VkSwapchainCreateInfoKHR {
+		VkStructureType                  sType;
+		const void*                      pNext;
+		VkSwapchainCreateFlagsKHR        flags;
+		VkSurfaceKHR                     surface;
+		uint32_t                         minImageCount;
+		VkFormat                         imageFormat;
+		VkColorSpaceKHR                  imageColorSpace;
+		VkExtent2D                       imageExtent;
+		uint32_t                         imageArrayLayers;
+		VkImageUsageFlags                imageUsage;
+		VkSharingMode                    imageSharingMode;
+		uint32_t                         queueFamilyIndexCount;
+		const uint32_t*                  pQueueFamilyIndices;
+		VkSurfaceTransformFlagBitsKHR    preTransform;
+		VkCompositeAlphaFlagBitsKHR      compositeAlpha;
+		VkPresentModeKHR                 presentMode;
+		VkBool32                         clipped;
+		VkSwapchainKHR                   oldSwapchain;
+	} VkSwapchainCreateInfoKHR;*/
+
+		VkSwapchainKHR swapchain;
+		result = vkCreateSwapchainKHR(device, &swapchain_info, /*allocator*/ nullptr, &swapchain);
+		assert(result == VK_SUCCESS);
 
 		while (true)
 		{
