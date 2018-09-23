@@ -109,18 +109,21 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		RegisterClassA(&window_class);
 
+		constexpr uint32 c_window_width = 1280;
+		constexpr uint32 c_window_height = 800;
+
 		HWND window_handle = CreateWindowA(
-		   window_class_name,
-		   "Thor",				// lpWindowName
-		   WS_OVERLAPPEDWINDOW, // dwStyle
-		   200,					// x
-		   100,					// y
-		   1280,				// nWidth
-		   800,					// nHeight
-		   nullptr,				// hWndParent
-		   nullptr,				// hMenu
-		   instance_handle,
-		   nullptr				// lpParam
+			window_class_name,
+			"Thor",				// lpWindowName
+			WS_OVERLAPPEDWINDOW,// dwStyle
+			200,				// x
+			100,				// y
+			c_window_width,		// nWidth
+			c_window_height,	// nHeight
+			nullptr,			// hWndParent
+			nullptr,			// hMenu
+			instance_handle,
+			nullptr				// lpParam
 		);
 
 		ShowWindow(window_handle, SW_SHOW);
@@ -301,10 +304,24 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		swapchain_info.minImageCount = surface_capabilities.minImageCount;
 		swapchain_info.imageFormat = surface_formats[0].format != VK_FORMAT_UNDEFINED ? surface_formats[0].format : VK_FORMAT_B8G8R8A8_UNORM; // todo(jbr) pick best image format/colourspace
 		swapchain_info.imageColorSpace = surface_formats[0].colorSpace;
-
-		swapchain_info.queueFamilyIndexCount = chosen_queue_count;
+		swapchain_info.imageExtent.width = c_window_width; // todo(jbr) find out what the surface supports
+		swapchain_info.imageExtent.height = c_window_height;
+		swapchain_info.imageArrayLayers = 1;
+		swapchain_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 		uint32 chosen_queues[2] = { graphics_queue_family_index, present_queue_family_index };
-		swapchain_info.pQueueFamilyIndices = chosen_queues;
+		if (chosen_queue_count == 1)
+		{
+			swapchain_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			swapchain_info.queueFamilyIndexCount = 0;		// only need to specify these if sharing mode is concurrent
+			swapchain_info.pQueueFamilyIndices = nullptr;
+		}
+		else
+		{
+			swapchain_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT; // todo(jbr) better to transfer ownership explicitly?
+			swapchain_info.queueFamilyIndexCount = chosen_queue_count;
+			swapchain_info.pQueueFamilyIndices = chosen_queues;
+		}
+		
 
 		/*typedef struct VkSwapchainCreateInfoKHR {
 		VkStructureType                  sType;
