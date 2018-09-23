@@ -170,6 +170,17 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
 		vkCreateDebugReportCallbackEXT(instance, &debug_callbacks_info, /*allocator*/ nullptr, &debug_callbacks);
 
+		VkWin32SurfaceCreateInfoKHR surface_info = {};
+		surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+		surface_info.pNext = nullptr;
+		surface_info.flags = 0;
+		surface_info.hinstance = instance_handle;
+		surface_info.hwnd = window_handle;
+
+		VkSurfaceKHR surface;
+		result = vkCreateWin32SurfaceKHR(instance, &surface_info, /*allocator*/ nullptr, &surface);
+		assert(result == VK_SUCCESS);
+
 		uint32 gpu_count;
 		result = vkEnumeratePhysicalDevices(instance, &gpu_count, /*out_physical_devices*/nullptr);
 		assert(result == VK_SUCCESS);
@@ -204,32 +215,61 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		VkQueueFamilyProperties* queue_families = (VkQueueFamilyProperties*)linear_allocator_alloc(&temp_allocator, sizeof(VkQueueFamilyProperties) * queue_family_count);
 		vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_family_count, queue_families);
 
-		uint32 chosen_queue_family_index = (uint32)-1;
+		uint32 graphics_queue_family_index = (uint32)-1;
+		uint32 present_queue_family_index = (uint32)-1;
 		for (uint32 i = 0; i < queue_family_count; ++i)
 		{
-			if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			VkBool32 present_supported;
+			result = vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &present_supported);
+			assert(result == VK_SUCCESS);
+
+			uint32 graphics_supported = queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
+
+			if (graphics_supported && present_supported)
 			{
-				chosen_queue_family_index = i;
+				graphics_queue_family_index = i;
+				present_queue_family_index = i;
 				break;
 			}
+			else
+			{
+				if (graphics_queue_family_index == (uint32)-1 && graphics_supported)
+				{
+					graphics_queue_family_index = i;
+				}
+				if (present_queue_family_index == (uint32)-1 && present_supported)
+				{
+					present_queue_family_index = i;
+				}
+			}
 		}
-		assert(chosen_queue_family_index != (uint32)-1);
+		assert(graphics_queue_family_index != (uint32)-1 && present_queue_family_index != (uint32)-1);
 
-		VkDeviceQueueCreateInfo queue_create_info = {};
-		queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-		queue_create_info.pNext = nullptr;
-		queue_create_info.flags = 0;
-		queue_create_info.queueFamilyIndex = chosen_queue_family_index;
-		queue_create_info.queueCount = 1;
+		VkDeviceQueueCreateInfo queue_create_info[2];
+		queue_create_info[0] = {};
+		queue_create_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queue_create_info[0].pNext = nullptr;
+		queue_create_info[0].flags = 0;
+		queue_create_info[0].queueFamilyIndex = graphics_queue_family_index;
+		queue_create_info[0].queueCount = 1;
 		float32 queue_priority = 1.0f;
-		queue_create_info.pQueuePriorities = &queue_priority;
+		queue_create_info[0].pQueuePriorities = &queue_priority;
+		queue_create_info[1] = {};
+		queue_create_info[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queue_create_info[1].pNext = nullptr;
+		queue_create_info[1].flags = 0;
+		queue_create_info[1].queueFamilyIndex = graphics_queue_family_index;
+		queue_create_info[1].queueCount = 1;
+		queue_create_info[1].pQueuePriorities = &queue_priority;
+		
+		uint32 chosen_queue_count = graphics_queue_family_index == present_queue_family_index ? 1 : 2;
 
 		VkDeviceCreateInfo device_info = {};
 		device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 		device_info.pNext = nullptr;
 		device_info.flags = 0;
-		device_info.queueCreateInfoCount = 1;
-		device_info.pQueueCreateInfos = &queue_create_info;
+		device_info.queueCreateInfoCount = chosen_queue_count;
+		device_info.pQueueCreateInfos = queue_create_info;
 		device_info.enabledLayerCount = 0;
 		device_info.ppEnabledLayerNames = nullptr;
 		const char* enabled_device_extension_names[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
@@ -241,15 +281,16 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		result = vkCreateDevice(gpu, &device_info, /*allocator*/ nullptr, &device);
 		assert(result == VK_SUCCESS);
 
-		VkWin32SurfaceCreateInfoKHR surface_info = {};
-		surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-		surface_info.pNext = nullptr;
-		surface_info.flags = 0;
-		surface_info.hinstance = instance_handle;
-		surface_info.hwnd = window_handle;
+		VkSurfaceCapabilitiesKHR surface_capabilities;
+		result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &surface_capabilities);
+		assert(result == VK_SUCCESS);
 
-		VkSurfaceKHR surface;
-		result = vkCreateWin32SurfaceKHR(instance, &surface_info, /*allocator*/ nullptr, &surface);
+		uint32 surface_format_count;
+		result = vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &surface_format_count, /*surface_formats*/ nullptr);
+		assert(result == VK_SUCCESS);
+
+		VkSurfaceFormatKHR* surface_formats = (VkSurfaceFormatKHR*)linear_allocator_alloc(&temp_allocator, sizeof(VkSurfaceFormatKHR) * surface_format_count);
+		result = vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &surface_format_count, surface_formats);
 		assert(result == VK_SUCCESS);
 
 		VkSwapchainCreateInfoKHR swapchain_info = {};
@@ -257,6 +298,13 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		swapchain_info.pNext = nullptr;
 		swapchain_info.flags = 0;
 		swapchain_info.surface = surface;
+		swapchain_info.minImageCount = surface_capabilities.minImageCount;
+		swapchain_info.imageFormat = surface_formats[0].format != VK_FORMAT_UNDEFINED ? surface_formats[0].format : VK_FORMAT_B8G8R8A8_UNORM; // todo(jbr) pick best image format/colourspace
+		swapchain_info.imageColorSpace = surface_formats[0].colorSpace;
+
+		swapchain_info.queueFamilyIndexCount = chosen_queue_count;
+		uint32 chosen_queues[2] = { graphics_queue_family_index, present_queue_family_index };
+		swapchain_info.pQueueFamilyIndices = chosen_queues;
 
 		/*typedef struct VkSwapchainCreateInfoKHR {
 		VkStructureType                  sType;
@@ -278,6 +326,8 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		VkBool32                         clipped;
 		VkSwapchainKHR                   oldSwapchain;
 	} VkSwapchainCreateInfoKHR;*/
+
+		
 
 		VkSwapchainKHR swapchain;
 		result = vkCreateSwapchainKHR(device, &swapchain_info, /*allocator*/ nullptr, &swapchain);
