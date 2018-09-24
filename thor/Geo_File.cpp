@@ -79,7 +79,7 @@ static uint32* geo_unpack_delta_compressed_triangles(File_Handle file, uint32 de
 					break; 
 				}
 
-				assert(triangle[component_i] >= 0); // todo(jbr) check triangle values are less than vertex count in calling code
+				assert(triangle[component_i] >= 0);
 
 				*dst_iter = triangle[component_i];
 				++dst_iter;
@@ -144,7 +144,8 @@ static float32* geo_unpack_delta_compressed_floats(File_Handle file, uint32 defl
 					break;
 				}
 
-				// todo(jbr) check nan etc
+				assert(!isnan(item[component_i]));
+				assert(!isinf(item[component_i]));
 
 				*dst_iter = item[component_i];
 				++dst_iter;
@@ -197,7 +198,7 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	uint8* header = inflated_header_bytes;
 
 	// info
-	uint32 geo_data_size = buffer_read_u32(&header);
+	buffer_skip(&header, 4); // geo data size (think this is combined tris/verts/normals/uvs/etc
 	uint32 texture_names_section_size = buffer_read_u32(&header);
 	uint32 bone_names_section_size = buffer_read_u32(&header);
 	uint32 texture_binds_section_size = buffer_read_u32(&header);
@@ -213,30 +214,16 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 
 	// texture names
 	uint8* texture_names_section = header;
-
 	uint32 geo_texture_count = buffer_read_u32(&header);
-	for (uint32 texture_i = 0; texture_i < geo_texture_count; ++texture_i)
-	{
-		uint32 offset = buffer_read_u32(&header);
-		int x = 1;
-	}
-	for (uint32 texture_i = 0; texture_i < geo_texture_count; ++texture_i)
-	{
-		char texture_name[512];
-		buffer_read_string(&header, texture_name, sizeof(texture_name));
-		int x = 1;
-	}
-
-	// there's some padding, couldn't figure out the rules for it, so just doing this
 	header = texture_names_section + texture_names_section_size;
 
 	// bone names
 	uint8* bone_names_section = header;
-	buffer_skip(&header, bone_names_section_size);
+	header = bone_names_section + bone_names_section_size;
 
 	// texture binds (used later)
 	uint8* texture_binds_section = header;
-	buffer_skip(&header, texture_binds_section_size);
+	header = texture_binds_section + texture_binds_section_size;
 
 	// lod section
 	uint8* lod_section = header;
@@ -343,9 +330,9 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		}
 
 		uint32* triangles = geo_unpack_delta_compressed_triangles(file, deflated_triangle_data_size, inflated_triangle_data_size, file_start_of_packed_data_pos + triangle_data_offset, model_triangle_count, allocator);
-		float32* vertices = geo_unpack_delta_compressed_floats(file, deflated_vertex_data_size, inflated_vertex_data_size, file_start_of_packed_data_pos + vertex_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
+		//float32* vertices = geo_unpack_delta_compressed_floats(file, deflated_vertex_data_size, inflated_vertex_data_size, file_start_of_packed_data_pos + vertex_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
 		float32* normals = geo_unpack_delta_compressed_floats(file, deflated_normal_data_size, inflated_normal_data_size, file_start_of_packed_data_pos + normal_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
-		float32* texcoords = geo_unpack_delta_compressed_floats(file, deflated_texcoord_data_size, inflated_texcoord_data_size, file_start_of_packed_data_pos + texcoord_data_offset, model_vertex_count, /*components_per_item*/2, allocator);
+		//float32* texcoords = geo_unpack_delta_compressed_floats(file, deflated_texcoord_data_size, inflated_texcoord_data_size, file_start_of_packed_data_pos + texcoord_data_offset, model_vertex_count, /*components_per_item*/2, allocator);
 		
 		uint32* triangles_end = triangles + (model_triangle_count * 3);
 		for (uint32* iter = triangles; iter != triangles_end; ++iter)
@@ -420,6 +407,8 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		}
 	}
 
+	/*
+	commenting out to suppress warnings
 	if (lod_section_size)
 	{
 		header = lod_section;
@@ -438,5 +427,5 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		}
 
 		assert((header - lod_section) <= lod_section_size);
-	}
+	}*/
 }

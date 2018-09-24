@@ -326,7 +326,7 @@ void bin_file_check_bounds(File_Handle file)
 	}
 }
 
-void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst) // todo(jbr) protect against buffer overrun
+void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
 {
 	uint16 string_length = file_read_u16(file);
 	assert(string_length < dst_size);
@@ -335,7 +335,7 @@ void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst) // todo(
 	dst[string_length] = 0;
 
 	// note: bin files need 4 byte aligned reads
-	uint32 bytes_misaligned = (string_length + 2) & 3; // equivalent to % 4
+	uint32 bytes_misaligned = (string_length + 2) & 3; // & 3 is equivalent to % 4
 	if (bytes_misaligned)
 	{
 		file_skip(file, 4 - bytes_misaligned);
