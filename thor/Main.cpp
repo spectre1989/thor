@@ -113,7 +113,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		linear_allocator_create(&temp_allocator, megabytes(32));
 
 		Graphics_State graphics_state;
-		graphics_init(&graphics_state);
+		graphics_init(&graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &temp_allocator);
 
 		while (true)
 		{

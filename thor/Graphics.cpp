@@ -1,6 +1,5 @@
 #include "Graphics.h"
 
-#include "Core.h"
 #include "Memory.h"
 #include <vulkan/vulkan.h>
 #include <cstdio>
@@ -35,6 +34,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
 
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* temp_allocator)
 {
+	*graphics_state = {};
+
 	VkApplicationInfo application_info = {};
 	application_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 	application_info.pNext = nullptr;
@@ -73,8 +74,8 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 	// todo(jbr) define out callbacks in release
 	VkDebugReportCallbackEXT debug_callbacks;
-	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-	vkCreateDebugReportCallbackEXT(instance, &debug_callbacks_info, /*allocator*/ nullptr, &debug_callbacks);
+	PFN_vkCreateDebugReportCallbackEXT vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(graphics_state->instance, "vkCreateDebugReportCallbackEXT");
+	vkCreateDebugReportCallbackEXT(graphics_state->instance, &debug_callbacks_info, /*allocator*/ nullptr, &debug_callbacks);
 
 	VkWin32SurfaceCreateInfoKHR surface_info = {};
 	surface_info.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
@@ -84,21 +85,20 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	surface_info.hwnd = window_handle;
 
 	VkSurfaceKHR surface;
-	result = vkCreateWin32SurfaceKHR(instance, &surface_info, /*allocator*/ nullptr, &surface);
+	result = vkCreateWin32SurfaceKHR(graphics_state->instance, &surface_info, /*allocator*/ nullptr, &surface);
 	assert(result == VK_SUCCESS);
 
 	uint32 gpu_count;
-	result = vkEnumeratePhysicalDevices(instance, &gpu_count, /*out_physical_devices*/nullptr);
+	result = vkEnumeratePhysicalDevices(graphics_state->instance, &gpu_count, /*out_physical_devices*/nullptr);
 	assert(result == VK_SUCCESS);
 	assert(gpu_count);
 
 	VkPhysicalDevice* gpus = (VkPhysicalDevice*)linear_allocator_alloc(temp_allocator, sizeof(VkPhysicalDevice) * gpu_count);
-	result = vkEnumeratePhysicalDevices(instance, &gpu_count, gpus);
+	result = vkEnumeratePhysicalDevices(graphics_state->instance, &gpu_count, gpus);
 	assert(result == VK_SUCCESS);
 
 	// for now just try to pick a dedicated gpu if available
 	// todo(jbr) properly examine gpus and decide on best one
-	VkPhysicalDevice gpu = nullptr;
 	for (uint32 i = 0; i < gpu_count; ++i)
 	{
 		VkPhysicalDeviceProperties gpu_properties;
@@ -106,27 +106,27 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		if (gpu_properties.deviceType == VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
 		{
-			gpu = gpus[i];
+			graphics_state->gpu = gpus[i];
 			break;
 		}
 	}
-	if (!gpu)
+	if (!graphics_state->gpu)
 	{
-		gpu = gpus[0];
+		graphics_state->gpu = gpus[0];
 	}
 		
 	uint32 queue_family_count;
-	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_family_count, /*queue_families*/ nullptr);
+	vkGetPhysicalDeviceQueueFamilyProperties(graphics_state->gpu, &queue_family_count, /*queue_families*/ nullptr);
 
 	VkQueueFamilyProperties* queue_families = (VkQueueFamilyProperties*)linear_allocator_alloc(temp_allocator, sizeof(VkQueueFamilyProperties) * queue_family_count);
-	vkGetPhysicalDeviceQueueFamilyProperties(gpu, &queue_family_count, queue_families);
+	vkGetPhysicalDeviceQueueFamilyProperties(graphics_state->gpu, &queue_family_count, queue_families);
 
 	uint32 graphics_queue_family_index = (uint32)-1;
 	uint32 present_queue_family_index = (uint32)-1;
 	for (uint32 i = 0; i < queue_family_count; ++i)
 	{
 		VkBool32 present_supported;
-		result = vkGetPhysicalDeviceSurfaceSupportKHR(gpu, i, surface, &present_supported);
+		result = vkGetPhysicalDeviceSurfaceSupportKHR(graphics_state->gpu, i, surface, &present_supported);
 		assert(result == VK_SUCCESS);
 
 		uint32 graphics_supported = queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT;
@@ -183,20 +183,19 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	device_info.ppEnabledExtensionNames = enabled_device_extension_names;
 	device_info.pEnabledFeatures = nullptr;
 
-	VkDevice device;
-	result = vkCreateDevice(gpu, &device_info, /*allocator*/ nullptr, &device);
+	result = vkCreateDevice(graphics_state->gpu, &device_info, /*allocator*/ nullptr, &graphics_state->device);
 	assert(result == VK_SUCCESS);
 
 	VkSurfaceCapabilitiesKHR surface_capabilities;
-	result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu, surface, &surface_capabilities);
+	result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(graphics_state->gpu, surface, &surface_capabilities);
 	assert(result == VK_SUCCESS);
 
 	uint32 surface_format_count;
-	result = vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &surface_format_count, /*surface_formats*/ nullptr);
+	result = vkGetPhysicalDeviceSurfaceFormatsKHR(graphics_state->gpu, surface, &surface_format_count, /*surface_formats*/ nullptr);
 	assert(result == VK_SUCCESS);
 
 	VkSurfaceFormatKHR* surface_formats = (VkSurfaceFormatKHR*)linear_allocator_alloc(temp_allocator, sizeof(VkSurfaceFormatKHR) * surface_format_count);
-	result = vkGetPhysicalDeviceSurfaceFormatsKHR(gpu, surface, &surface_format_count, surface_formats);
+	result = vkGetPhysicalDeviceSurfaceFormatsKHR(graphics_state->gpu, surface, &surface_format_count, surface_formats);
 	assert(result == VK_SUCCESS);
 
 	VkSwapchainCreateInfoKHR swapchain_info = {};
@@ -205,7 +204,8 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	swapchain_info.flags = 0;
 	swapchain_info.surface = surface;
 	swapchain_info.minImageCount = surface_capabilities.minImageCount;
-	swapchain_info.imageFormat = surface_formats[0].format != VK_FORMAT_UNDEFINED ? surface_formats[0].format : VK_FORMAT_B8G8R8A8_UNORM; // todo(jbr) pick best image format/colourspace
+	VkFormat swapchain_image_format = surface_formats[0].format != VK_FORMAT_UNDEFINED ? surface_formats[0].format : VK_FORMAT_B8G8R8A8_UNORM; // todo(jbr) pick best image format/colourspace
+	swapchain_info.imageFormat = swapchain_image_format;
 	swapchain_info.imageColorSpace = surface_formats[0].colorSpace;
 	if (surface_capabilities.currentExtent.width == 0xffffffff)
 	{
@@ -267,6 +267,37 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	swapchain_info.oldSwapchain = nullptr;
 
 	VkSwapchainKHR swapchain;
-	result = vkCreateSwapchainKHR(device, &swapchain_info, /*allocator*/ nullptr, &swapchain);
+	result = vkCreateSwapchainKHR(graphics_state->device, &swapchain_info, /*allocator*/ nullptr, &swapchain);
 	assert(result == VK_SUCCESS);
+
+	uint32 swapchain_image_count;
+	result = vkGetSwapchainImagesKHR(graphics_state->device, swapchain, &swapchain_image_count, /*swapchain_images*/ nullptr);
+	assert(result == VK_SUCCESS);
+
+	VkImage* swapchain_images = (VkImage*)linear_allocator_alloc(temp_allocator, sizeof(VkImage) * swapchain_image_count);
+	result = vkGetSwapchainImagesKHR(graphics_state->device, swapchain, &swapchain_image_count, swapchain_images);
+	assert(result == VK_SUCCESS);
+
+	VkImageView* swapchain_image_views = (VkImageView*)linear_allocator_alloc(temp_allocator, sizeof(VkImageView) * swapchain_image_count);
+	VkImageViewCreateInfo image_view_info = {};
+	image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	image_view_info.pNext = nullptr;
+	image_view_info.flags = 0;
+	image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	image_view_info.format = swapchain_image_format;
+	image_view_info.components.r = VK_COMPONENT_SWIZZLE_R;
+	image_view_info.components.g = VK_COMPONENT_SWIZZLE_G;
+	image_view_info.components.b = VK_COMPONENT_SWIZZLE_B;
+	image_view_info.components.a = VK_COMPONENT_SWIZZLE_A;
+	image_view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	image_view_info.subresourceRange.baseMipLevel = 0;
+	image_view_info.subresourceRange.levelCount = 1;
+	image_view_info.subresourceRange.baseArrayLayer = 0;
+	image_view_info.subresourceRange.layerCount = 1;
+	for (uint32 i = 0; i < swapchain_image_count; ++i)
+	{
+		image_view_info.image = swapchain_images[i];
+		result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &swapchain_image_views[i]);
+		assert(result == VK_SUCCESS);
+	}
 }
