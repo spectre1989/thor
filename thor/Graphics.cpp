@@ -300,4 +300,26 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &swapchain_image_views[i]);
 		assert(result == VK_SUCCESS);
 	}
+
+	VkImageCreateInfo depth_buffer_info = {};
+	depth_buffer_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	depth_buffer_info.pNext = nullptr;
+	depth_buffer_info.flags = 0;
+	depth_buffer_info.imageType = VK_IMAGE_TYPE_2D;
+	depth_buffer_info.format = VK_FORMAT_D32_SFLOAT;
+	depth_buffer_info.extent.width = swapchain_info.imageExtent.width;
+	depth_buffer_info.extent.height = swapchain_info.imageExtent.height;
+	depth_buffer_info.extent.depth = 1;
+	depth_buffer_info.mipLevels = 1;
+	depth_buffer_info.arrayLayers = 1;
+	depth_buffer_info.samples = VK_SAMPLE_COUNT_1_BIT; // todo(jbr) multisampling depth buffers?
+	depth_buffer_info.tiling = VK_IMAGE_TILING_OPTIMAL;
+	depth_buffer_info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	depth_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	depth_buffer_info.queueFamilyIndexCount = 0;
+	depth_buffer_info.pQueueFamilyIndices = nullptr;
+	depth_buffer_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VkImage depth_buffer;
+	vkCreateImage(graphics_state->device, &depth_buffer_info, /*allocator*/ nullptr, &depth_buffer);
 }
