@@ -32,6 +32,20 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
 	return VK_FALSE; // the caller shouldn't abort
 }
 
+static uint32 get_memory_type_index(VkPhysicalDeviceMemoryProperties* gpu_memory_properties, uint32 supported_memory_type_bits, VkMemoryPropertyFlags required_properties)
+{
+	for (uint32 i = 0; i < gpu_memory_properties->memoryTypeCount; ++i)
+	{
+		if ((1 << i) & supported_memory_type_bits &&
+			gpu_memory_properties->memoryTypes[i].propertyFlags & required_properties)
+		{
+			return i;
+		}
+	}
+
+	return (uint32)-1;
+}
+
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
@@ -321,5 +335,72 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	depth_buffer_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	VkImage depth_buffer;
-	vkCreateImage(graphics_state->device, &depth_buffer_info, /*allocator*/ nullptr, &depth_buffer);
+	result = vkCreateImage(graphics_state->device, &depth_buffer_info, /*allocator*/ nullptr, &depth_buffer);
+	assert(result == VK_SUCCESS);
+
+	VkPhysicalDeviceMemoryProperties gpu_memory_properties = {};
+	vkGetPhysicalDeviceMemoryProperties(graphics_state->gpu, &gpu_memory_properties);
+
+	VkMemoryRequirements memory_requirements = {};
+	vkGetImageMemoryRequirements(graphics_state->device, depth_buffer, &memory_requirements);
+
+	VkMemoryAllocateInfo mem_alloc_info = {};
+	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mem_alloc_info.pNext = nullptr;
+	mem_alloc_info.allocationSize = memory_requirements.size;
+	mem_alloc_info.memoryTypeIndex = get_memory_type_index(&gpu_memory_properties, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
+
+	VkDeviceMemory depth_buffer_mem;
+	result = vkAllocateMemory(graphics_state->device, &mem_alloc_info, /*allocator*/ nullptr, &depth_buffer_mem);
+	assert(result == VK_SUCCESS);
+
+	result = vkBindImageMemory(graphics_state->device, depth_buffer, depth_buffer_mem, /*offset*/ 0);
+	assert(result == VK_SUCCESS);
+
+	image_view_info = {};
+	image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	image_view_info.pNext = nullptr;
+	image_view_info.flags = 0;
+	image_view_info.image = depth_buffer;
+	image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	image_view_info.format = depth_buffer_info.format;
+	image_view_info.components.r = VK_COMPONENT_SWIZZLE_R;
+	image_view_info.components.g = VK_COMPONENT_SWIZZLE_G;
+	image_view_info.components.b = VK_COMPONENT_SWIZZLE_B;
+	image_view_info.components.a = VK_COMPONENT_SWIZZLE_A;
+	image_view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	image_view_info.subresourceRange.baseMipLevel = 0;
+	image_view_info.subresourceRange.levelCount = 1;
+	image_view_info.subresourceRange.baseArrayLayer = 0;
+	image_view_info.subresourceRange.layerCount = 1;
+	
+	VkImageView depth_buffer_image_view;
+	result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &depth_buffer_image_view);
+	assert(result == VK_SUCCESS);
+
+	VkBufferCreateInfo uniform_buffer_info = {};
+	uniform_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	uniform_buffer_info.pNext = nullptr;
+	uniform_buffer_info.flags = 0;
+	uniform_buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	uniform_buffer_info.size = 256 * 4 * 4 * sizeof(float32);
+	uniform_buffer_info.queueFamilyIndexCount = 0;
+	uniform_buffer_info.pQueueFamilyIndices = nullptr;
+	uniform_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	
+	VkBuffer uniform_buffer;
+	result = vkCreateBuffer(graphics_state->device, &uniform_buffer_info, /*allocator*/ nullptr, &uniform_buffer);
+	assert(result == VK_SUCCESS);
+
+	mem_alloc_info = {};
+	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mem_alloc_info.pNext = nullptr;
+	mem_alloc_info.allocationSize = memory_requirements.size;
+	mem_alloc_info.memoryTypeIndex = get_memory_type_index(&gpu_memory_properties, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
+
+	VkDeviceMemory uniform_buffer_memory;
+	result = vkAllocateMemory(graphics_state->device, &mem_alloc_info, /*allocator*/ nullptr, &uniform_buffer_memory);
+	assert(result == VK_SUCCESS);
 }
