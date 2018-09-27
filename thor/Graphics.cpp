@@ -379,12 +379,15 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &depth_buffer_image_view);
 	assert(result == VK_SUCCESS);
 
+	constexpr uint32 c_matrix_count = 256;
+	constexpr uint32 c_ubo_size = c_matrix_count * 4 * 4 * sizeof(float32);
+
 	VkBufferCreateInfo uniform_buffer_info = {};
 	uniform_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	uniform_buffer_info.pNext = nullptr;
 	uniform_buffer_info.flags = 0;
 	uniform_buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	uniform_buffer_info.size = 256 * 4 * 4 * sizeof(float32);
+	uniform_buffer_info.size = c_ubo_size;
 	uniform_buffer_info.queueFamilyIndexCount = 0;
 	uniform_buffer_info.pQueueFamilyIndices = nullptr;
 	uniform_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -403,4 +406,98 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkDeviceMemory uniform_buffer_memory;
 	result = vkAllocateMemory(graphics_state->device, &mem_alloc_info, /*allocator*/ nullptr, &uniform_buffer_memory);
 	assert(result == VK_SUCCESS);
+
+	float* matrix_data;
+	result = vkMapMemory(graphics_state->device, uniform_buffer_memory, /*offset*/ 0, c_ubo_size, /*flags*/ 0, (void**)&matrix_data);
+	assert(result == VK_SUCCESS);
+
+	for (int32 matrix_i = 0; matrix_i < c_matrix_count; ++matrix_i)
+	{
+		for (int32 component_i = 0; component_i < 16; ++component_i)
+		{
+			matrix_data[component_i] = 0.0f;
+		}
+	}
+
+	vkUnmapMemory(graphics_state->device, uniform_buffer_memory);
+
+	result = vkBindBufferMemory(graphics_state->device, uniform_buffer, uniform_buffer_memory, /*offset*/ 0);
+	assert(result == VK_SUCCESS);
+
+	VkDescriptorSetLayoutBinding layout_binding = {};
+	layout_binding.binding = 0;
+	layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	layout_binding.descriptorCount = 1;
+	layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	layout_binding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo descriptor_set_layout_info = {};
+	descriptor_set_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	descriptor_set_layout_info.pNext = nullptr;
+	descriptor_set_layout_info.flags = 0;
+	descriptor_set_layout_info.bindingCount = 1;
+	descriptor_set_layout_info.pBindings = &layout_binding;
+
+	VkDescriptorSetLayout descriptor_set_layout;
+	result = vkCreateDescriptorSetLayout(graphics_state->device, &descriptor_set_layout_info, /*allocator*/ nullptr, &descriptor_set_layout);
+	assert(result == VK_SUCCESS);
+
+	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
+	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipeline_layout_info.pNext = nullptr;
+	pipeline_layout_info.flags = 0;
+	pipeline_layout_info.setLayoutCount = 1;
+	pipeline_layout_info.pSetLayouts = &descriptor_set_layout;
+	pipeline_layout_info.pushConstantRangeCount = 0;
+	pipeline_layout_info.pPushConstantRanges = nullptr;
+
+	VkPipelineLayout pipeline_layout;
+	result = vkCreatePipelineLayout(graphics_state->device, &pipeline_layout_info, /*allocator*/ nullptr, &pipeline_layout);
+	assert(result == VK_SUCCESS);
+
+	VkDescriptorPoolSize descriptor_pool_size = {};
+	descriptor_pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptor_pool_size.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo descriptor_pool_info = {};
+	descriptor_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptor_pool_info.pNext = nullptr;
+	descriptor_pool_info.flags = 0;
+	descriptor_pool_info.maxSets = 1;
+	descriptor_pool_info.poolSizeCount = 1;
+	descriptor_pool_info.pPoolSizes = &descriptor_pool_size;
+
+	VkDescriptorPool descriptor_pool;
+	result = vkCreateDescriptorPool(graphics_state->device, &descriptor_pool_info, /*allocator*/ nullptr, &descriptor_pool);
+	assert(result == VK_SUCCESS);
+
+	VkDescriptorSetAllocateInfo descriptor_set_alloc_info = {};
+	descriptor_set_alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descriptor_set_alloc_info.pNext = nullptr;
+	descriptor_set_alloc_info.descriptorPool = descriptor_pool;
+	descriptor_set_alloc_info.descriptorSetCount = 1;
+	descriptor_set_alloc_info.pSetLayouts = &descriptor_set_layout;
+
+	VkDescriptorSet descriptor_set;
+	result = vkAllocateDescriptorSets(graphics_state->device, &descriptor_set_alloc_info, &descriptor_set);
+	assert(result == VK_SUCCESS);
+
+	VkDescriptorBufferInfo buffer_info = {};
+	buffer_info.buffer = uniform_buffer;
+	buffer_info.offset = 0;
+	buffer_info.range = memory_requirements.size;
+
+	VkWriteDescriptorSet descriptor_set_write = {};
+	descriptor_set_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptor_set_write.pNext = nullptr;
+	descriptor_set_write.dstSet = descriptor_set;
+	descriptor_set_write.dstBinding = 0;
+	descriptor_set_write.dstArrayElement = 0;
+	descriptor_set_write.descriptorCount = 1;
+	descriptor_set_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptor_set_write.pImageInfo = nullptr;
+	descriptor_set_write.pBufferInfo = &buffer_info;
+	descriptor_set_write.pTexelBufferView = nullptr;
+
+	vkUpdateDescriptorSets(graphics_state->device, /*write_count*/ 1, &descriptor_set_write, /*copy_count*/ 0, /*copies*/ nullptr);
 }
