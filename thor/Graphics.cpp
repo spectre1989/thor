@@ -37,7 +37,7 @@ static uint32 get_memory_type_index(VkPhysicalDeviceMemoryProperties* gpu_memory
 	for (uint32 i = 0; i < gpu_memory_properties->memoryTypeCount; ++i)
 	{
 		if ((1 << i) & supported_memory_type_bits &&
-			gpu_memory_properties->memoryTypes[i].propertyFlags & required_properties)
+			(gpu_memory_properties->memoryTypes[i].propertyFlags & required_properties) == required_properties)
 		{
 			return i;
 		}
@@ -395,6 +395,8 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkBuffer uniform_buffer;
 	result = vkCreateBuffer(graphics_state->device, &uniform_buffer_info, /*allocator*/ nullptr, &uniform_buffer);
 	assert(result == VK_SUCCESS);
+
+	vkGetBufferMemoryRequirements(graphics_state->device, uniform_buffer, &memory_requirements);
 
 	mem_alloc_info = {};
 	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
