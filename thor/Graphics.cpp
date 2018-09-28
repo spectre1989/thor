@@ -320,7 +320,8 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	depth_buffer_info.pNext = nullptr;
 	depth_buffer_info.flags = 0;
 	depth_buffer_info.imageType = VK_IMAGE_TYPE_2D;
-	depth_buffer_info.format = VK_FORMAT_D32_SFLOAT;
+	const VkFormat c_depth_buffer_format = VK_FORMAT_D32_SFLOAT;
+	depth_buffer_info.format = c_depth_buffer_format;
 	depth_buffer_info.extent.width = swapchain_info.imageExtent.width;
 	depth_buffer_info.extent.height = swapchain_info.imageExtent.height;
 	depth_buffer_info.extent.depth = 1;
@@ -502,4 +503,61 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	descriptor_set_write.pTexelBufferView = nullptr;
 
 	vkUpdateDescriptorSets(graphics_state->device, /*write_count*/ 1, &descriptor_set_write, /*copy_count*/ 0, /*copies*/ nullptr);
+
+	VkAttachmentDescription attachments[2];
+	attachments[0] = {};
+	attachments[0].flags = 0;
+	attachments[0].format = swapchain_image_format;
+	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT; // todo(jbr) is this AA?
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	attachments[1] = {};
+	attachments[1].flags = 0;
+	attachments[1].format = c_depth_buffer_format;
+	attachments[1].samples = VK_SAMPLE_COUNT_1_BIT; // todo(jbr) is this AA?
+	attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colour_attachment_reference = {};
+	colour_attachment_reference.attachment = 0;
+	colour_attachment_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depth_attachment_reference = {};
+	depth_attachment_reference.attachment = 1;
+	depth_attachment_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.flags = 0;
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.inputAttachmentCount = 0;
+	subpass.pInputAttachments = nullptr;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colour_attachment_reference;
+	subpass.pResolveAttachments = nullptr;
+	subpass.pDepthStencilAttachment = &depth_attachment_reference;
+	subpass.preserveAttachmentCount = 0;
+	subpass.pPreserveAttachments = nullptr;
+
+	VkRenderPassCreateInfo render_pass_info = {};
+	render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	render_pass_info.pNext = nullptr;
+	render_pass_info.flags = 0;
+	render_pass_info.attachmentCount = 2;
+	render_pass_info.pAttachments = attachments;
+	render_pass_info.subpassCount = 1;
+	render_pass_info.pSubpasses = &subpass;
+	render_pass_info.dependencyCount = 0;
+	render_pass_info.pDependencies = nullptr;
+
+	VkRenderPass render_pass;
+	result = vkCreateRenderPass(graphics_state->device, &render_pass_info, /*allocator*/ nullptr, &render_pass);
+	assert(result == VK_SUCCESS);
 }
