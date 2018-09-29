@@ -1,5 +1,6 @@
 #include "Graphics.h"
 
+#include "File.h"
 #include "Memory.h"
 #include <vulkan/vulkan.h>
 #include <cstdio>
@@ -44,6 +45,27 @@ static uint32 get_memory_type_index(VkPhysicalDeviceMemoryProperties* gpu_memory
 	}
 
 	return (uint32)-1;
+}
+
+static VkShaderModule create_shader_module(VkDevice device, const char* shader_file_path, Linear_Allocator* temp_allocator)
+{
+	File_Handle shader_file = file_open_read(shader_file_path);
+	uint32 shader_file_size = file_size(shader_file);
+	uint8* shader_bytes = linear_allocator_alloc(temp_allocator, shader_file_size);
+	file_read(shader_file, shader_file_size, /*out*/ shader_bytes);
+
+	VkShaderModuleCreateInfo shader_module_info = {};
+	shader_module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	shader_module_info.pNext = nullptr;
+	shader_module_info.flags = 0;
+	shader_module_info.codeSize = shader_file_size;
+	shader_module_info.pCode = (uint32*)shader_bytes;
+
+	VkShaderModule shader_module;
+	VkResult result = vkCreateShaderModule(device, &shader_module_info, /*allocator*/ nullptr, &shader_module);
+	assert(result == VK_SUCCESS);
+
+	return shader_module;
 }
 
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* temp_allocator)
@@ -560,4 +582,45 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkRenderPass render_pass;
 	result = vkCreateRenderPass(graphics_state->device, &render_pass_info, /*allocator*/ nullptr, &render_pass);
 	assert(result == VK_SUCCESS);
+
+	VkPipelineShaderStageCreateInfo shader_stage_info[2];
+	shader_stage_info[0] = {};
+	shader_stage_info[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stage_info[0].pNext = nullptr;
+	shader_stage_info[0].flags = 0;
+	shader_stage_info[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shader_stage_info[0].module = create_shader_module(graphics_state->device, "shaders/shader.vert.spv", temp_allocator);
+	shader_stage_info[0].pName = "main";
+	shader_stage_info[0].pSpecializationInfo = nullptr;
+	shader_stage_info[1] = {};
+	shader_stage_info[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stage_info[1].pNext = nullptr;
+	shader_stage_info[1].flags = 0;
+	shader_stage_info[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shader_stage_info[1].module = create_shader_module(graphics_state->device, "shaders/shader.frag.spv", temp_allocator);
+	shader_stage_info[1].pName = "main";
+	shader_stage_info[1].pSpecializationInfo = nullptr;
+
+	VkFramebuffer* framebuffers = (VkFramebuffer*)linear_allocator_alloc(temp_allocator, sizeof(VkFramebuffer) * swapchain_image_count); // todo(jbr) make sure anything actually stored comes from a permanent allocator
+
+	VkImageView framebuffer_attachments[2];
+	framebuffer_attachments[1] = depth_buffer_image_view;
+
+	VkFramebufferCreateInfo framebuffer_info = {};
+	framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	framebuffer_info.pNext = nullptr;
+	framebuffer_info.flags = 0;
+	framebuffer_info.renderPass = render_pass;
+	framebuffer_info.attachmentCount = 2;
+	framebuffer_info.pAttachments = framebuffer_attachments;
+	framebuffer_info.width = swapchain_info.imageExtent.width;
+	framebuffer_info.height = swapchain_info.imageExtent.height;
+	framebuffer_info.layers = 1;
+
+	for (uint32 i = 0; i < swapchain_image_count; ++i)
+	{
+		framebuffer_attachments[0] = swapchain_image_views[i];
+
+		vkCreateFramebuffer(graphics_state->device, &framebuffer_info, /*allocator*/ nullptr, &framebuffers[i]);
+	}
 }

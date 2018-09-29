@@ -28,8 +28,8 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 	uint32 file_sig = file_read_u32(file);
 	assert(file_sig == c_pigg_file_sig);
-	uint16 unknown = file_read_u16(file);
-	uint16 version = file_read_u16(file);
+	//uint16 unknown = file_read_u16(file); disabling warning
+	//uint16 version = file_read_u16(file); disabling warning
 	uint16 header_size = file_read_u16(file);
 	assert(header_size == 16);
 	uint16 used_header_bytes = file_read_u16(file);
@@ -50,7 +50,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		entry->offset = file_read_u32(file);
 		entry->unknown = file_read_u32(file);
 		entry->header_id = file_read_u32(file);
-		file_read_bytes(file, 16, entry->md5);
+		file_read(file, 16, entry->md5);
 		entry->compressed_size = file_read_u32(file);
 	}
 
@@ -69,7 +69,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		uint32 string_length = file_read_u32(file);
 		assert(string_length <= (file_names_data_size - num_table_bytes_read));
 
-		file_read_bytes(file, string_length, &file_names_data[num_table_bytes_read]);
+		file_read(file, string_length, &file_names_data[num_table_bytes_read]);
 
 		file_names[i] = &file_names_data[num_table_bytes_read];
 
@@ -93,13 +93,13 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 		if (entry->compressed_size == 0)
 		{
-			file_read_bytes(file, entry->file_size, out_buffer);
+			file_read(file, entry->file_size, out_buffer);
 		}
 		else
 		{
 			assert(entry->compressed_size != entry->file_size); // I *think* uncompressed data will have compressed_size of 0, but asserting in case I'm wrong
 
-			file_read_bytes(file, entry->compressed_size, in_buffer);
+			file_read(file, entry->compressed_size, in_buffer);
 
 			zlib_inflate_bytes(in_buffer, entry->compressed_size, out_buffer, entry->file_size);
 		}
@@ -107,7 +107,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		assert(entry->name_id < file_names_table_count);
 
 		char path_buffer[512];
-		uint32 path_buffer_strlen = string_concat("unpacked/", file_names[entry->name_id], path_buffer);
+		string_concat("unpacked/", file_names[entry->name_id], path_buffer);
 
 		for (uint32 string_i = 0; path_buffer[string_i]; ++string_i)
 		{

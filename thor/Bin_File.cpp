@@ -16,7 +16,7 @@ uint32 bin_file_read_color(File_Handle file);
 void bin_file_check(File_Handle file)
 {
 	uint8 sig[8];
-	file_read_bytes(file, 8, sig);
+	file_read(file, 8, sig);
 	if (!bytes_equal(sig, c_bin_file_sig, 8))
 	{
 		return; // todo(jbr) some bins have a different format
@@ -331,7 +331,7 @@ void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
 	uint16 string_length = file_read_u16(file);
 	assert(string_length < dst_size);
 
-	file_read_bytes(file, string_length, dst);
+	file_read(file, string_length, dst);
 	dst[string_length] = 0;
 
 	// note: bin files need 4 byte aligned reads

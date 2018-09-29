@@ -20,7 +20,7 @@ void file_close(File_Handle file)
 	CloseHandle(file);
 }
 
-void file_read_bytes(File_Handle file, uint32 byte_count, void* bytes)
+void file_read(File_Handle file, uint32 byte_count, void* bytes)
 {
 	DWORD num_bytes_read;
 	bool success = ReadFile(file, bytes, byte_count, &num_bytes_read, /*lpOverlapped*/ nullptr);
@@ -30,28 +30,28 @@ void file_read_bytes(File_Handle file, uint32 byte_count, void* bytes)
 uint32 file_read_u32(File_Handle file)
 {
 	uint32 u32;
-	file_read_bytes(file, sizeof(u32), &u32);
+	file_read(file, sizeof(u32), &u32);
 	return u32;
 }
 
 uint16 file_read_u16(File_Handle file)
 {
 	uint16 u16;
-	file_read_bytes(file, sizeof(u16), &u16);
+	file_read(file, sizeof(u16), &u16);
 	return u16;
 }
 
 float32 file_read_f32(File_Handle file)
 {
 	float32 f32;
-	file_read_bytes(file, sizeof(f32), &f32);
+	file_read(file, sizeof(f32), &f32);
 	return f32;
 }
 
 Vec3 file_read_vec3(File_Handle file)
 {
 	Vec3 v3;
-	file_read_bytes(file, sizeof(float32) * 3, &v3);
+	file_read(file, sizeof(float32) * 3, &v3);
 	return v3;
 }
 
@@ -59,6 +59,11 @@ void file_skip(File_Handle file, uint32 byte_count)
 {
 	DWORD result = SetFilePointer(file, byte_count, /*PLONG lpDistanceToMoveHigh*/ nullptr, FILE_CURRENT);
 	assert(result != INVALID_SET_FILE_POINTER);
+}
+
+uint32 file_size(File_Handle file)
+{
+	return GetFileSize(file, /*lpFileSizeHigh*/ nullptr);
 }
 
 uint32 file_get_position(File_Handle file)
