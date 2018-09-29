@@ -68,6 +68,49 @@ static VkShaderModule create_shader_module(VkDevice device, const char* shader_f
 	return shader_module;
 }
 
+static void create_buffer(VkDevice device, 
+	VkPhysicalDeviceMemoryProperties* gpu_memory_properties, 
+	VkDeviceSize size, 
+	VkBufferUsageFlags usage_flags, 
+	VkMemoryPropertyFlags required_memory_properties,
+	VkBuffer* out_buffer,
+	VkDeviceMemory* out_buffer_memory)
+{
+	VkBufferCreateInfo buffer_info = {};
+	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_info.pNext = nullptr;
+	buffer_info.flags = 0;
+	buffer_info.size = size;
+	buffer_info.usage = usage_flags;
+	buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	buffer_info.queueFamilyIndexCount = 0;
+	buffer_info.pQueueFamilyIndices = nullptr;
+
+	VkBuffer buffer;
+	VkResult result = vkCreateBuffer(device, &buffer_info, /*allocator*/ nullptr, &buffer);
+	assert(result == VK_SUCCESS);
+
+	VkMemoryRequirements memory_requirements;
+	vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
+
+	VkMemoryAllocateInfo mem_alloc_info = {};
+	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mem_alloc_info.pNext = nullptr;
+	mem_alloc_info.allocationSize = memory_requirements.size;
+	mem_alloc_info.memoryTypeIndex = get_memory_type_index(gpu_memory_properties, memory_requirements.memoryTypeBits, required_memory_properties);
+	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
+
+	VkDeviceMemory buffer_memory;
+	result = vkAllocateMemory(device, &mem_alloc_info, /*allocator*/ nullptr, &buffer_memory);
+	assert(result == VK_SUCCESS);
+
+	result = vkBindBufferMemory(device, buffer, buffer_memory, /*offset*/ 0);
+	assert(result == VK_SUCCESS);
+
+	*out_buffer = buffer;
+	*out_buffer_memory = buffer_memory;
+}
+
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
@@ -405,32 +448,15 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	constexpr uint32 c_matrix_count = 256;
 	constexpr uint32 c_ubo_size = c_matrix_count * 4 * 4 * sizeof(float32);
 
-	VkBufferCreateInfo uniform_buffer_info = {};
-	uniform_buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	uniform_buffer_info.pNext = nullptr;
-	uniform_buffer_info.flags = 0;
-	uniform_buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	uniform_buffer_info.size = c_ubo_size;
-	uniform_buffer_info.queueFamilyIndexCount = 0;
-	uniform_buffer_info.pQueueFamilyIndices = nullptr;
-	uniform_buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	
 	VkBuffer uniform_buffer;
-	result = vkCreateBuffer(graphics_state->device, &uniform_buffer_info, /*allocator*/ nullptr, &uniform_buffer);
-	assert(result == VK_SUCCESS);
-
-	vkGetBufferMemoryRequirements(graphics_state->device, uniform_buffer, &memory_requirements);
-
-	mem_alloc_info = {};
-	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	mem_alloc_info.pNext = nullptr;
-	mem_alloc_info.allocationSize = memory_requirements.size;
-	mem_alloc_info.memoryTypeIndex = get_memory_type_index(&gpu_memory_properties, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
-
 	VkDeviceMemory uniform_buffer_memory;
-	result = vkAllocateMemory(graphics_state->device, &mem_alloc_info, /*allocator*/ nullptr, &uniform_buffer_memory);
-	assert(result == VK_SUCCESS);
+	create_buffer(graphics_state->device, 
+		&gpu_memory_properties, 
+		c_ubo_size, 
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		&uniform_buffer, 
+		&uniform_buffer_memory);
 
 	float* matrix_data;
 	result = vkMapMemory(graphics_state->device, uniform_buffer_memory, /*offset*/ 0, c_ubo_size, /*flags*/ 0, (void**)&matrix_data);
@@ -445,9 +471,6 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	}
 
 	vkUnmapMemory(graphics_state->device, uniform_buffer_memory);
-
-	result = vkBindBufferMemory(graphics_state->device, uniform_buffer, uniform_buffer_memory, /*offset*/ 0);
-	assert(result == VK_SUCCESS);
 
 	VkDescriptorSetLayoutBinding layout_binding = {};
 	layout_binding.binding = 0;
@@ -623,4 +646,50 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		vkCreateFramebuffer(graphics_state->device, &framebuffer_info, /*allocator*/ nullptr, &framebuffers[i]);
 	}
+
+	constexpr int32 c_num_vertices = 4;
+	constexpr int32 c_num_floats_per_vertex = 3;
+	constexpr int32 c_num_vertex_floats = c_num_vertices * c_num_floats_per_vertex;
+	constexpr int32 c_vbo_size = c_num_vertex_floats * sizeof(float32);
+	float32 vertices[c_num_vertex_floats] = {
+		-0.5f, 0.0f, -0.5f, // bottom left
+		-0.5f, 0.0f, 0.5f, // top left
+		0.5f, 0.0f, 0.5f, // top right
+		0.5f, 0.0f, -0.5f // bottom right
+	};
+
+	VkBuffer vertex_buffer;
+	VkDeviceMemory vertex_buffer_memory;
+	create_buffer(graphics_state->device,
+		&gpu_memory_properties,
+		c_vbo_size,
+		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&vertex_buffer,
+		&vertex_buffer_memory);
+
+	float* vbo_data;
+	result = vkMapMemory(graphics_state->device, vertex_buffer_memory, /*offset*/ 0, c_vbo_size, /*flags*/ 0, (void**)&vbo_data);
+	assert(result == VK_SUCCESS);
+
+	float* src_iter = vertices;
+	float* src_end = vertices + c_num_vertex_floats;
+	float* dst_iter = vbo_data;
+	for (; src_iter != src_end; ++src_iter)
+	{
+		*dst_iter = *src_iter;
+	}
+
+	vkUnmapMemory(graphics_state->device, vertex_buffer_memory);
+
+	VkVertexInputBindingDescription vertex_input_binding = {};
+	vertex_input_binding.binding = 0;
+	vertex_input_binding.stride = sizeof(float32) * c_num_floats_per_vertex;
+	vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+	VkVertexInputAttributeDescription vertex_input_attribute = {};
+	vertex_input_attribute.location = 0;
+	vertex_input_attribute.binding = 0;
+	vertex_input_attribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+	vertex_input_attribute.offset = 0;
 }
