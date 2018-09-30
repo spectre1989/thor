@@ -606,24 +606,6 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateRenderPass(graphics_state->device, &render_pass_info, /*allocator*/ nullptr, &render_pass);
 	assert(result == VK_SUCCESS);
 
-	VkPipelineShaderStageCreateInfo shader_stage_info[2];
-	shader_stage_info[0] = {};
-	shader_stage_info[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shader_stage_info[0].pNext = nullptr;
-	shader_stage_info[0].flags = 0;
-	shader_stage_info[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-	shader_stage_info[0].module = create_shader_module(graphics_state->device, "shaders/shader.vert.spv", temp_allocator);
-	shader_stage_info[0].pName = "main";
-	shader_stage_info[0].pSpecializationInfo = nullptr;
-	shader_stage_info[1] = {};
-	shader_stage_info[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	shader_stage_info[1].pNext = nullptr;
-	shader_stage_info[1].flags = 0;
-	shader_stage_info[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	shader_stage_info[1].module = create_shader_module(graphics_state->device, "shaders/shader.frag.spv", temp_allocator);
-	shader_stage_info[1].pName = "main";
-	shader_stage_info[1].pSpecializationInfo = nullptr;
-
 	VkFramebuffer* framebuffers = (VkFramebuffer*)linear_allocator_alloc(temp_allocator, sizeof(VkFramebuffer) * swapchain_image_count); // todo(jbr) make sure anything actually stored comes from a permanent allocator
 
 	VkImageView framebuffer_attachments[2];
@@ -682,6 +664,25 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 	vkUnmapMemory(graphics_state->device, vertex_buffer_memory);
 
+	constexpr uint32 c_num_shader_stages = 2;
+	VkPipelineShaderStageCreateInfo shader_stage_info[c_num_shader_stages];
+	shader_stage_info[0] = {};
+	shader_stage_info[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stage_info[0].pNext = nullptr;
+	shader_stage_info[0].flags = 0;
+	shader_stage_info[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+	shader_stage_info[0].module = create_shader_module(graphics_state->device, "shaders/shader.vert.spv", temp_allocator);
+	shader_stage_info[0].pName = "main";
+	shader_stage_info[0].pSpecializationInfo = nullptr;
+	shader_stage_info[1] = {};
+	shader_stage_info[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	shader_stage_info[1].pNext = nullptr;
+	shader_stage_info[1].flags = 0;
+	shader_stage_info[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shader_stage_info[1].module = create_shader_module(graphics_state->device, "shaders/shader.frag.spv", temp_allocator);
+	shader_stage_info[1].pName = "main";
+	shader_stage_info[1].pSpecializationInfo = nullptr;
+
 	VkVertexInputBindingDescription vertex_input_binding = {};
 	vertex_input_binding.binding = 0;
 	vertex_input_binding.stride = sizeof(float32) * c_num_floats_per_vertex;
@@ -692,4 +693,124 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	vertex_input_attribute.binding = 0;
 	vertex_input_attribute.format = VK_FORMAT_R32G32B32_SFLOAT;
 	vertex_input_attribute.offset = 0;
+
+	VkPipelineVertexInputStateCreateInfo vertex_input_state_info = {};
+	vertex_input_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertex_input_state_info.pNext = nullptr;
+	vertex_input_state_info.flags = 0;
+	vertex_input_state_info.vertexBindingDescriptionCount = 1;
+	vertex_input_state_info.pVertexBindingDescriptions = &vertex_input_binding;
+	vertex_input_state_info.vertexAttributeDescriptionCount = 1;
+	vertex_input_state_info.pVertexAttributeDescriptions = &vertex_input_attribute;
+
+	VkPipelineInputAssemblyStateCreateInfo input_assembly_state_info = {};
+	input_assembly_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	input_assembly_state_info.pNext = nullptr;
+	input_assembly_state_info.flags = 0;
+	input_assembly_state_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	input_assembly_state_info.primitiveRestartEnable = false;
+
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = swapchain_info.imageExtent.width;
+	viewport.height = swapchain_info.imageExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissors = {};
+	scissors.offset.x = 0.0f;
+	scissors.offset.y = 0.0f;
+	scissors.extent = swapchain_info.imageExtent;
+
+	VkPipelineViewportStateCreateInfo viewport_state_info = {};
+	viewport_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewport_state_info.pNext = nullptr;
+	viewport_state_info.flags = 0;
+	viewport_state_info.viewportCount = 1;
+	viewport_state_info.pViewports = &viewport;
+	viewport_state_info.scissorCount = 1;
+	viewport_state_info.pScissors = &scissors;
+
+	VkPipelineRasterizationStateCreateInfo rasterisation_state_info = {};
+	rasterisation_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterisation_state_info.pNext = nullptr;
+	rasterisation_state_info.flags = 0;
+	rasterisation_state_info.depthClampEnable = false; // todo(jbr) is depth clamping good?
+	rasterisation_state_info.rasterizerDiscardEnable = false;
+	rasterisation_state_info.polygonMode = VK_POLYGON_MODE_LINE;
+	rasterisation_state_info.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterisation_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterisation_state_info.depthBiasEnable = false;
+	rasterisation_state_info.depthBiasConstantFactor = 0.0f;
+	rasterisation_state_info.depthBiasClamp = 0.0f;
+	rasterisation_state_info.depthBiasSlopeFactor = 0.0f;
+	rasterisation_state_info.lineWidth = 1.0f;
+
+	VkPipelineMultisampleStateCreateInfo multisample_state_info = {};
+	multisample_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisample_state_info.pNext = nullptr;
+	multisample_state_info.flags = 0;
+	multisample_state_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisample_state_info.sampleShadingEnable = false;
+	multisample_state_info.minSampleShading = 0.0f;
+	multisample_state_info.pSampleMask = nullptr;
+	multisample_state_info.alphaToCoverageEnable = false;
+	multisample_state_info.alphaToOneEnable = false;
+
+	VkPipelineDepthStencilStateCreateInfo depth_stencil_state_info = {};
+	depth_stencil_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+	depth_stencil_state_info.pNext = nullptr;
+	depth_stencil_state_info.flags = 0;
+	depth_stencil_state_info.depthTestEnable = true;
+	depth_stencil_state_info.depthWriteEnable = true;
+	depth_stencil_state_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+	depth_stencil_state_info.depthBoundsTestEnable = false;
+	depth_stencil_state_info.stencilTestEnable = false;
+	depth_stencil_state_info.front = {};
+	depth_stencil_state_info.back = {};
+	depth_stencil_state_info.minDepthBounds = 0.0f;
+	depth_stencil_state_info.maxDepthBounds = 0.0f;
+
+	VkGraphicsPipelineCreateInfo pipeline_info = {};
+	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+	pipeline_info.pNext = nullptr;
+	pipeline_info.flags = 0;
+	pipeline_info.stageCount = c_num_shader_stages;
+	pipeline_info.pStages = shader_stage_info;
+	pipeline_info.pVertexInputState = &vertex_input_state_info;
+	pipeline_info.pInputAssemblyState = &input_assembly_state_info;
+	pipeline_info.pTessellationState = nullptr;
+	pipeline_info.pViewportState = &viewport_state_info;
+	pipeline_info.pRasterizationState = &rasterisation_state_info;
+	pipeline_info.pMultisampleState = &multisample_state_info;
+	pipeline_info.pDepthStencilState = &depth_stencil_state_info;
+	pipeline_info.pColorBlendState = ;
+	pipeline_info.pDynamicState = ;
+	pipeline_info.layout = pipeline_layout;
+	pipeline_info.renderPass = render_pass;
+	pipeline_info.subpass = ;
+	pipeline_info.basePipelineHandle = ;
+	pipeline_info.basePipelineIndex = ;
+
+	/*
+	pColorBlendState is a pointer to an instance of the VkPipelineColorBlendStateCreateInfo structure, and is ignored if the pipeline has rasterization disabled or if the subpass of the render pass the pipeline is created against does not use any color attachments.
+
+	pDynamicState is a pointer to VkPipelineDynamicStateCreateInfo and is used to indicate which properties of the pipeline state object are dynamic and can be changed independently of the pipeline state. This can be NULL, which means no state in the pipeline is considered dynamic.
+
+	layout is the description of binding locations used by both the pipeline and descriptor sets used with the pipeline.
+
+	renderPass is a handle to a render pass object describing the environment in which the pipeline will be used; the pipeline must only be used with an instance of any render pass compatible with the one provided. See Render Pass Compatibility for more information.
+
+	subpass is the index of the subpass in the render pass where this pipeline will be used.
+
+	basePipelineHandle is a pipeline to derive from.
+
+	basePipelineIndex is an index into the pCreateInfos parameter to use as a pipeline to derive from.
+	
+	*/
+
+	VkPipeline pipeline;
+	result = vkCreateGraphicsPipelines(graphics_state->device, /*pipeline_cache*/ nullptr, /*pipeline_count*/ 1, &pipeline_info, /*allocator*/ nullptr, &pipeline);
+	assert(result == VK_SUCCESS);
 }
