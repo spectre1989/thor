@@ -48,11 +48,11 @@ float32 file_read_f32(File_Handle file)
 	return f32;
 }
 
-Vec3 file_read_vec3(File_Handle file)
+Vec_3f file_read_vec_3f(File_Handle file)
 {
-	Vec3 v3;
-	file_read(file, sizeof(float32) * 3, &v3);
-	return v3;
+	Vec_3f v;
+	file_read(file, sizeof(float32) * 3, &v);
+	return v;
 }
 
 void file_skip(File_Handle file, uint32 byte_count)

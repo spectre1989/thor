@@ -14,7 +14,7 @@ typedef int32_t int32;
 typedef int64_t int64;
 typedef float float32;
 
-struct Vec3
+struct Vec_3f
 {
 	float x, y, z;
 };

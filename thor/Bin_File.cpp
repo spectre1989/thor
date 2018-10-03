@@ -85,8 +85,8 @@ void bin_file_check_geobin(File_Handle file)
 			uint32 start = file_get_position(file);
 
 			bin_file_read_string(file, sizeof(buffer), buffer); // name
-			Vec3 pos = file_read_vec3(file);
-			Vec3 rot = file_read_vec3(file);
+			Vec_3f pos = file_read_vec_3f(file);
+			Vec_3f rot = file_read_vec_3f(file);
 			//uint32 flags = file_read_u32(file);
 
 			assert((file_get_position(file) - start) == size);

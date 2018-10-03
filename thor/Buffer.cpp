@@ -57,15 +57,15 @@ float32 buffer_read_f32(uint8** inout_buffer)
 	return *p;
 }
 
-Vec3 buffer_read_vec3(uint8** inout_buffer)
+Vec_3f buffer_read_vec_3f(uint8** inout_buffer)
 {
 	uint8* buffer = *inout_buffer;
 	float32* p = (float32*)buffer;
 
-	Vec3 v;
+	Vec_3f v;
 	v.x = p[0];
-	v.y = p[0];
-	v.z = p[0];
+	v.y = p[1];
+	v.z = p[2];
 
 	buffer += sizeof(float32) * 3;
 	*inout_buffer = buffer;
