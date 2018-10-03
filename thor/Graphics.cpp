@@ -21,8 +21,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
 		flags == VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT ||
 		flags == VK_DEBUG_REPORT_ERROR_BIT_EXT)
 	{
-		int x = 1;
-		x *= 2;
+		DebugBreak();
 	}
 
 	char buffer[1024];
@@ -407,14 +406,14 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkPhysicalDeviceMemoryProperties gpu_memory_properties = {};
 	vkGetPhysicalDeviceMemoryProperties(graphics_state->gpu, &gpu_memory_properties);
 
-	VkMemoryRequirements memory_requirements = {};
-	vkGetImageMemoryRequirements(graphics_state->device, depth_buffer, &memory_requirements);
+	VkMemoryRequirements depth_buffer_memory_requirements = {};
+	vkGetImageMemoryRequirements(graphics_state->device, depth_buffer, &depth_buffer_memory_requirements);
 
 	VkMemoryAllocateInfo mem_alloc_info = {};
 	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	mem_alloc_info.pNext = nullptr;
-	mem_alloc_info.allocationSize = memory_requirements.size;
-	mem_alloc_info.memoryTypeIndex = get_memory_type_index(&gpu_memory_properties, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	mem_alloc_info.allocationSize = depth_buffer_memory_requirements.size;
+	mem_alloc_info.memoryTypeIndex = get_memory_type_index(&gpu_memory_properties, depth_buffer_memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
 
 	VkDeviceMemory depth_buffer_mem;
@@ -533,7 +532,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkDescriptorBufferInfo buffer_info = {};
 	buffer_info.buffer = uniform_buffer;
 	buffer_info.offset = 0;
-	buffer_info.range = memory_requirements.size;
+	buffer_info.range = c_ubo_size;
 
 	VkWriteDescriptorSet descriptor_set_write = {};
 	descriptor_set_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -713,14 +712,14 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
 	viewport.y = 0.0f;
-	viewport.width = swapchain_info.imageExtent.width;
-	viewport.height = swapchain_info.imageExtent.height;
+	viewport.width = (float32)swapchain_info.imageExtent.width;
+	viewport.height = (float32)swapchain_info.imageExtent.height;
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
 
 	VkRect2D scissors = {};
-	scissors.offset.x = 0.0f;
-	scissors.offset.y = 0.0f;
+	scissors.offset.x = 0;
+	scissors.offset.y = 0;
 	scissors.extent = swapchain_info.imageExtent;
 
 	VkPipelineViewportStateCreateInfo viewport_state_info = {};
@@ -772,6 +771,29 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	depth_stencil_state_info.minDepthBounds = 0.0f;
 	depth_stencil_state_info.maxDepthBounds = 0.0f;
 
+	VkPipelineColorBlendAttachmentState colour_blend_attachment = {};
+	colour_blend_attachment.blendEnable = false;
+	colour_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colour_blend_attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colour_blend_attachment.colorBlendOp = VK_BLEND_OP_ADD;
+	colour_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colour_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+	colour_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+	colour_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	
+	VkPipelineColorBlendStateCreateInfo colour_blend_state_info = {};
+	colour_blend_state_info.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colour_blend_state_info.pNext = nullptr;
+	colour_blend_state_info.flags = 0;
+	colour_blend_state_info.logicOpEnable = false;
+	colour_blend_state_info.logicOp = VK_LOGIC_OP_NO_OP;
+	colour_blend_state_info.attachmentCount = 1;
+	colour_blend_state_info.pAttachments = &colour_blend_attachment;
+	colour_blend_state_info.blendConstants[0] = 1.0f;
+	colour_blend_state_info.blendConstants[1] = 1.0f;
+	colour_blend_state_info.blendConstants[2] = 1.0f;
+	colour_blend_state_info.blendConstants[3] = 1.0f;
+
 	VkGraphicsPipelineCreateInfo pipeline_info = {};
 	pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 	pipeline_info.pNext = nullptr;
@@ -785,30 +807,13 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	pipeline_info.pRasterizationState = &rasterisation_state_info;
 	pipeline_info.pMultisampleState = &multisample_state_info;
 	pipeline_info.pDepthStencilState = &depth_stencil_state_info;
-	pipeline_info.pColorBlendState = ;
-	pipeline_info.pDynamicState = ;
+	pipeline_info.pColorBlendState = &colour_blend_state_info;
+	pipeline_info.pDynamicState = nullptr;
 	pipeline_info.layout = pipeline_layout;
 	pipeline_info.renderPass = render_pass;
-	pipeline_info.subpass = ;
-	pipeline_info.basePipelineHandle = ;
-	pipeline_info.basePipelineIndex = ;
-
-	/*
-	pColorBlendState is a pointer to an instance of the VkPipelineColorBlendStateCreateInfo structure, and is ignored if the pipeline has rasterization disabled or if the subpass of the render pass the pipeline is created against does not use any color attachments.
-
-	pDynamicState is a pointer to VkPipelineDynamicStateCreateInfo and is used to indicate which properties of the pipeline state object are dynamic and can be changed independently of the pipeline state. This can be NULL, which means no state in the pipeline is considered dynamic.
-
-	layout is the description of binding locations used by both the pipeline and descriptor sets used with the pipeline.
-
-	renderPass is a handle to a render pass object describing the environment in which the pipeline will be used; the pipeline must only be used with an instance of any render pass compatible with the one provided. See Render Pass Compatibility for more information.
-
-	subpass is the index of the subpass in the render pass where this pipeline will be used.
-
-	basePipelineHandle is a pipeline to derive from.
-
-	basePipelineIndex is an index into the pCreateInfos parameter to use as a pipeline to derive from.
-	
-	*/
+	pipeline_info.subpass = 0;
+	pipeline_info.basePipelineHandle = nullptr;
+	pipeline_info.basePipelineIndex = 0;
 
 	VkPipeline pipeline;
 	result = vkCreateGraphicsPipelines(graphics_state->device, /*pipeline_cache*/ nullptr, /*pipeline_count*/ 1, &pipeline_info, /*allocator*/ nullptr, &pipeline);

@@ -39,6 +39,7 @@ static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_p
 	return DefWindowProcA(window_handle, msg, w_param, l_param);
 }
 
+// todo(jbr) would it be better to use wall and disable selectively?
 int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle*/, LPSTR cmd_line, int /*cmd_show*/)
 {
 	bool unpack_piggs = false;
