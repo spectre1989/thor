@@ -168,6 +168,7 @@
     <ClCompile Include="File.cpp" />
     <ClCompile Include="Geo_File.cpp" />
     <ClCompile Include="Graphics.cpp" />
+    <ClCompile Include="Maths.cpp" />
     <ClCompile Include="Memory.cpp" />
     <ClCompile Include="Pigg_File.cpp" />
     <ClCompile Include="String.cpp" />
@@ -186,6 +187,7 @@
     <ClInclude Include="File.h" />
     <ClInclude Include="Geo_File.h" />
     <ClInclude Include="Graphics.h" />
+    <ClInclude Include="Maths.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="Pigg_File.h" />
     <ClInclude Include="Core.h" />

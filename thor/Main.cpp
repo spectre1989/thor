@@ -124,6 +124,8 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 				TranslateMessage(&msg);
 				DispatchMessageA(&msg);
 			}
+
+			graphics_draw(&graphics_state, /*camera_position*/ vec_3f(0.0f, 0.0f, 0.0f), /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
 		}
 	}
 

@@ -248,6 +248,9 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		
 	uint32 chosen_queue_count = graphics_queue_family_index == present_queue_family_index ? 1 : 2;
 
+	VkPhysicalDeviceFeatures gpu_features_to_enable = {};
+	gpu_features_to_enable.fillModeNonSolid = true; // for wireframe drawing
+
 	VkDeviceCreateInfo device_info = {};
 	device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	device_info.pNext = nullptr;
@@ -259,7 +262,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	const char* enabled_device_extension_names[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 	device_info.enabledExtensionCount = sizeof(enabled_device_extension_names) / sizeof(enabled_device_extension_names[0]);
 	device_info.ppEnabledExtensionNames = enabled_device_extension_names;
-	device_info.pEnabledFeatures = nullptr;
+	device_info.pEnabledFeatures = &gpu_features_to_enable;
 
 	result = vkCreateDevice(graphics_state->gpu, &device_info, /*allocator*/ nullptr, &graphics_state->device);
 	assert(result == VK_SUCCESS);
@@ -818,4 +821,26 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkPipeline pipeline;
 	result = vkCreateGraphicsPipelines(graphics_state->device, /*pipeline_cache*/ nullptr, /*pipeline_count*/ 1, &pipeline_info, /*allocator*/ nullptr, &pipeline);
 	assert(result == VK_SUCCESS);
+
+	matrix_4x4_projection(
+		&graphics_state->projection_matrix,
+		/*fov_y*/ 90.0f,
+		/*aspect_ratio*/ swapchain_info.imageExtent.width / (float32)swapchain_info.imageExtent.height,
+		/*near_plane*/ 0.1f,
+		/*far_plane*/ 10.0f);
+}
+
+void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3f cube_position)
+{
+	Matrix_4x4 view_matrix;
+	matrix_4x4_lookat(&view_matrix, camera_position, cube_position, /*up*/ vec_3f(0.0f, 0.0f, 1.0f));
+
+	Matrix_4x4 cube_model_matrix;
+	matrix_4x4_translation(&cube_model_matrix, cube_position);
+
+	Matrix_4x4 model_view_matrix;
+	matrix_4x4_mul(&model_view_matrix, &view_matrix, &cube_model_matrix);
+
+	Matrix_4x4 mvp_matrix;
+	matrix_4x4_mul(&mvp_matrix, &graphics_state->projection_matrix, &model_view_matrix);
 }
