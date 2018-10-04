@@ -110,11 +110,14 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		ShowWindow(window_handle, SW_SHOW);
 
-		Linear_Allocator temp_allocator;
-		linear_allocator_create(&temp_allocator, megabytes(32));
+		Linear_Allocator allocator;
+		linear_allocator_create(&allocator, megabytes(1));
 
-		Graphics_State graphics_state;
-		graphics_init(&graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &temp_allocator);
+		Linear_Allocator temp_allocator;
+		linear_allocator_create(&temp_allocator, megabytes(1));
+
+		Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
+		graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
 
 		while (true)
 		{
@@ -125,7 +128,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 				DispatchMessageA(&msg);
 			}
 
-			graphics_draw(&graphics_state, /*camera_position*/ vec_3f(0.0f, 0.0f, 0.0f), /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
+			graphics_draw(graphics_state, /*camera_position*/ vec_3f(0.0f, 0.0f, 0.0f), /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
 		}
 	}
 

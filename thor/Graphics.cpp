@@ -110,7 +110,7 @@ static void create_buffer(VkDevice device,
 	*out_buffer_memory = buffer_memory;
 }
 
-void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* temp_allocator)
+void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
 
@@ -631,15 +631,15 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		vkCreateFramebuffer(graphics_state->device, &framebuffer_info, /*allocator*/ nullptr, &framebuffers[i]);
 	}
 
-	constexpr int32 c_num_vertices = 4;
-	constexpr int32 c_num_floats_per_vertex = 3;
-	constexpr int32 c_num_vertex_floats = c_num_vertices * c_num_floats_per_vertex;
-	constexpr int32 c_vbo_size = c_num_vertex_floats * sizeof(float32);
-	float32 vertices[c_num_vertex_floats] = {
-		-0.5f, 0.0f, -0.5f, // bottom left
-		-0.5f, 0.0f, 0.5f, // top left
-		0.5f, 0.0f, 0.5f, // top right
-		0.5f, 0.0f, -0.5f // bottom right
+	constexpr int32 c_vertex_count = 4;
+	constexpr int32 c_float32_count_per_vertex = 3;
+	constexpr int32 c_vertex_float32_count = c_vertex_count * c_float32_count_per_vertex;
+	constexpr int32 c_vbo_size = c_vertex_float32_count * sizeof(float32);
+	float32 vertices[c_vertex_float32_count] = {
+		-0.5f, 0.0f, 0.5f,	// top left
+		0.5f, 0.0f, 0.5f,	// top right
+		0.5f, 0.0f, -0.5f,	// bottom right
+		-0.5f, 0.0f, -0.5f	// bottom left
 	};
 
 	VkBuffer vertex_buffer;
@@ -656,15 +656,46 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkMapMemory(graphics_state->device, vertex_buffer_memory, /*offset*/ 0, c_vbo_size, /*flags*/ 0, (void**)&vbo_data);
 	assert(result == VK_SUCCESS);
 
-	float* src_iter = vertices;
-	float* src_end = vertices + c_num_vertex_floats;
-	float* dst_iter = vbo_data;
-	for (; src_iter != src_end; ++src_iter)
+	float* src_v_iter = vertices;
+	float* src_v_end = vertices + c_vertex_float32_count;
+	float* dst_v_iter = vbo_data;
+	for (; src_v_iter != src_v_end; ++src_v_iter, ++dst_v_iter)
 	{
-		*dst_iter = *src_iter;
+		*dst_v_iter = *src_v_iter;
 	}
 
 	vkUnmapMemory(graphics_state->device, vertex_buffer_memory);
+
+	constexpr int32 c_index_count = 6;
+	constexpr int32 c_ibo_size = c_index_count * sizeof(uint16);
+	uint16 indicies[c_index_count] = {
+		0, 1, 2,
+		0, 2, 3
+	};
+
+	VkBuffer index_buffer;
+	VkDeviceMemory index_buffer_memory;
+	create_buffer(graphics_state->device,
+		&gpu_memory_properties,
+		c_ibo_size,
+		VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		&index_buffer,
+		&index_buffer_memory);
+
+	uint16* ibo_data;
+	result = vkMapMemory(graphics_state->device, index_buffer_memory, /*offset*/ 0, c_ibo_size, /*flags*/ 0, (void**)&ibo_data);
+	assert(result == VK_SUCCESS);
+
+	uint16* src_i_iter = indicies;
+	uint16* src_i_end = indicies + c_index_count;
+	uint16* dst_i_iter = ibo_data;
+	for (; src_i_iter != src_i_end; ++src_i_iter, ++dst_i_iter)
+	{
+		*dst_i_iter = *src_i_iter;
+	}
+
+	vkUnmapMemory(graphics_state->device, index_buffer_memory);
 
 	constexpr uint32 c_num_shader_stages = 2;
 	VkPipelineShaderStageCreateInfo shader_stage_info[c_num_shader_stages];
@@ -687,7 +718,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 	VkVertexInputBindingDescription vertex_input_binding = {};
 	vertex_input_binding.binding = 0;
-	vertex_input_binding.stride = sizeof(float32) * c_num_floats_per_vertex;
+	vertex_input_binding.stride = sizeof(float32) * c_float32_count_per_vertex;
 	vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 	VkVertexInputAttributeDescription vertex_input_attribute = {};
@@ -829,19 +860,6 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		/*near_plane*/ 0.1f,
 		/*far_plane*/ 10.0f);
 
-	constexpr int32 c_vertex_count = 4;
-	constexpr int32 c_index_count = 6;
-	Vec_3f vertices[c_vertex_count] = {
-		vec_3f(-0.5f, 0.0f, 0.5f),	// top left
-		vec_3f(0.5f, 0.0f, 0.5f),	// top right
-		vec_3f(0.5f, 0.0f, -0.5f),	// bottom right
-		vec_3f(-0.5f, 0.0f, -0.5f)	// bottom left
-	};
-	uint16 indicies[c_index_count] = {
-		0, 1, 2,
-		0, 2, 3
-	};
-
 	VkCommandPoolCreateInfo command_pool_info = {};
 	command_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	command_pool_info.pNext = nullptr;
@@ -857,10 +875,10 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	command_buffer_alloc_info.pNext = nullptr;
 	command_buffer_alloc_info.commandPool = command_pool;
 	command_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	command_buffer_alloc_info.commandBufferCount = 1;
+	command_buffer_alloc_info.commandBufferCount = swapchain_image_count;
 
-	VkCommandBuffer command_buffer;
-	result = vkAllocateCommandBuffers(graphics_state->device, &command_buffer_alloc_info, &command_buffer);
+	graphics_state->command_buffers = (VkCommandBuffer*)linear_allocator_alloc(allocator, sizeof(VkCommandBuffer) * swapchain_image_count);
+	result = vkAllocateCommandBuffers(graphics_state->device, &command_buffer_alloc_info, graphics_state->command_buffers);
 	assert(result == VK_SUCCESS);
 
 	VkCommandBufferBeginInfo command_buffer_begin_info = {};
@@ -869,13 +887,47 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	command_buffer_begin_info.flags = 0;
 	command_buffer_begin_info.pInheritanceInfo = nullptr;
 	
-	result = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
-	assert(result == VK_SUCCESS);
+	VkClearValue clear_values[2];
+	clear_values[0] = {};
+	clear_values[0].color.float32[0] = 0.0f;
+	clear_values[0].color.float32[1] = 0.0f;
+	clear_values[0].color.float32[2] = 0.0f;
+	clear_values[0].color.float32[3] = 0.0f;
+	clear_values[1] = {};
+	clear_values[1].depthStencil.depth = 1.0f;
 
-	vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
+	VkRenderPassBeginInfo render_pass_begin_info = {};
+	render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	render_pass_begin_info.pNext = nullptr;
+	render_pass_begin_info.renderPass = render_pass;
+	render_pass_begin_info.renderArea = scissors;
+	render_pass_begin_info.clearValueCount = 2;
+	render_pass_begin_info.pClearValues = clear_values;
 
-	result = vkEndCommandBuffer(command_buffer);
-	assert(result == VK_SUCCESS);
+	for (uint32 command_buffer_i = 0; command_buffer_i < swapchain_image_count; ++command_buffer_i)
+	{
+		VkCommandBuffer command_buffer = graphics_state->command_buffers[command_buffer_i];
+
+		result = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
+		assert(result == VK_SUCCESS);
+
+		render_pass_begin_info.framebuffer = framebuffers[command_buffer_i];
+		vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+		vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+		// todo(jbr) bind descriptor sets
+
+		VkDeviceSize offset = 0;
+		vkCmdBindVertexBuffers(command_buffer, /*first_binding*/ 0, /*binding_count*/ 1, &vertex_buffer, &offset);
+
+		vkCmdBindIndexBuffer(command_buffer, index_buffer, /*offset*/ 0, VK_INDEX_TYPE_UINT16);
+
+		vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
+
+		result = vkEndCommandBuffer(command_buffer);
+		assert(result == VK_SUCCESS);
+	}
 }
 
 void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3f cube_position)
