@@ -741,7 +741,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	rasterisation_state_info.depthClampEnable = false; // todo(jbr) is depth clamping good?
 	rasterisation_state_info.rasterizerDiscardEnable = false;
 	rasterisation_state_info.polygonMode = VK_POLYGON_MODE_LINE;
-	rasterisation_state_info.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterisation_state_info.cullMode = VK_CULL_MODE_NONE; // VK_CULL_MODE_BACK_BIT; disabling this while drawing in wireframe
 	rasterisation_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterisation_state_info.depthBiasEnable = false;
 	rasterisation_state_info.depthBiasConstantFactor = 0.0f;
@@ -828,6 +828,54 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		/*aspect_ratio*/ swapchain_info.imageExtent.width / (float32)swapchain_info.imageExtent.height,
 		/*near_plane*/ 0.1f,
 		/*far_plane*/ 10.0f);
+
+	constexpr int32 c_vertex_count = 4;
+	constexpr int32 c_index_count = 6;
+	Vec_3f vertices[c_vertex_count] = {
+		vec_3f(-0.5f, 0.0f, 0.5f),	// top left
+		vec_3f(0.5f, 0.0f, 0.5f),	// top right
+		vec_3f(0.5f, 0.0f, -0.5f),	// bottom right
+		vec_3f(-0.5f, 0.0f, -0.5f)	// bottom left
+	};
+	uint16 indicies[c_index_count] = {
+		0, 1, 2,
+		0, 2, 3
+	};
+
+	VkCommandPoolCreateInfo command_pool_info = {};
+	command_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+	command_pool_info.pNext = nullptr;
+	command_pool_info.flags = 0;
+	command_pool_info.queueFamilyIndex = graphics_queue_family_index;
+
+	VkCommandPool command_pool;
+	result = vkCreateCommandPool(graphics_state->device, &command_pool_info, /*allocator*/ nullptr, &command_pool);
+	assert(result == VK_SUCCESS);
+
+	VkCommandBufferAllocateInfo command_buffer_alloc_info = {};
+	command_buffer_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	command_buffer_alloc_info.pNext = nullptr;
+	command_buffer_alloc_info.commandPool = command_pool;
+	command_buffer_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	command_buffer_alloc_info.commandBufferCount = 1;
+
+	VkCommandBuffer command_buffer;
+	result = vkAllocateCommandBuffers(graphics_state->device, &command_buffer_alloc_info, &command_buffer);
+	assert(result == VK_SUCCESS);
+
+	VkCommandBufferBeginInfo command_buffer_begin_info = {};
+	command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	command_buffer_begin_info.pNext = nullptr;
+	command_buffer_begin_info.flags = 0;
+	command_buffer_begin_info.pInheritanceInfo = nullptr;
+	
+	result = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
+	assert(result == VK_SUCCESS);
+
+	vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
+
+	result = vkEndCommandBuffer(command_buffer);
+	assert(result == VK_SUCCESS);
 }
 
 void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3f cube_position)
@@ -843,4 +891,6 @@ void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3
 
 	Matrix_4x4 mvp_matrix;
 	matrix_4x4_mul(&mvp_matrix, &graphics_state->projection_matrix, &model_view_matrix);
+
+	
 }
