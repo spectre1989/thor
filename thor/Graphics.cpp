@@ -267,6 +267,9 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateDevice(graphics_state->gpu, &device_info, /*allocator*/ nullptr, &graphics_state->device);
 	assert(result == VK_SUCCESS);
 
+	vkGetDeviceQueue(graphics_state->device, graphics_queue_family_index, /*queue_index*/ 0, &graphics_state->graphics_queue);
+	vkGetDeviceQueue(graphics_state->device, present_queue_family_index, /*queue_index*/ 0, &graphics_state->present_queue);
+
 	VkSurfaceCapabilitiesKHR surface_capabilities;
 	result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(graphics_state->gpu, surface, &surface_capabilities);
 	assert(result == VK_SUCCESS);
@@ -279,13 +282,14 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkGetPhysicalDeviceSurfaceFormatsKHR(graphics_state->gpu, surface, &surface_format_count, surface_formats);
 	assert(result == VK_SUCCESS);
 
+	VkFormat swapchain_image_format = surface_formats[0].format != VK_FORMAT_UNDEFINED ? surface_formats[0].format : VK_FORMAT_B8G8R8A8_UNORM; // todo(jbr) pick best image format/colourspace
+
 	VkSwapchainCreateInfoKHR swapchain_info = {};
 	swapchain_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
 	swapchain_info.pNext = nullptr;
 	swapchain_info.flags = 0;
 	swapchain_info.surface = surface;
 	swapchain_info.minImageCount = surface_capabilities.minImageCount;
-	VkFormat swapchain_image_format = surface_formats[0].format != VK_FORMAT_UNDEFINED ? surface_formats[0].format : VK_FORMAT_B8G8R8A8_UNORM; // todo(jbr) pick best image format/colourspace
 	swapchain_info.imageFormat = swapchain_image_format;
 	swapchain_info.imageColorSpace = surface_formats[0].colorSpace;
 	if (surface_capabilities.currentExtent.width == 0xffffffff)
@@ -347,16 +351,15 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	swapchain_info.clipped = true;
 	swapchain_info.oldSwapchain = nullptr;
 
-	VkSwapchainKHR swapchain;
-	result = vkCreateSwapchainKHR(graphics_state->device, &swapchain_info, /*allocator*/ nullptr, &swapchain);
+	result = vkCreateSwapchainKHR(graphics_state->device, &swapchain_info, /*allocator*/ nullptr, &graphics_state->swapchain);
 	assert(result == VK_SUCCESS);
 
 	uint32 swapchain_image_count;
-	result = vkGetSwapchainImagesKHR(graphics_state->device, swapchain, &swapchain_image_count, /*swapchain_images*/ nullptr);
+	result = vkGetSwapchainImagesKHR(graphics_state->device, graphics_state->swapchain, &swapchain_image_count, /*swapchain_images*/ nullptr);
 	assert(result == VK_SUCCESS);
 
 	VkImage* swapchain_images = (VkImage*)linear_allocator_alloc(temp_allocator, sizeof(VkImage) * swapchain_image_count);
-	result = vkGetSwapchainImagesKHR(graphics_state->device, swapchain, &swapchain_image_count, swapchain_images);
+	result = vkGetSwapchainImagesKHR(graphics_state->device, graphics_state->swapchain, &swapchain_image_count, swapchain_images);
 	assert(result == VK_SUCCESS);
 
 	VkImageView* swapchain_image_views = (VkImageView*)linear_allocator_alloc(temp_allocator, sizeof(VkImageView) * swapchain_image_count);
@@ -916,7 +919,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-		// todo(jbr) bind descriptor sets
+		vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, /*first_set*/ 0, /*set_count*/ 1, &descriptor_set, /*dynamic_offset_count*/ 0, /*dynamic_offsets*/ nullptr);
 
 		VkDeviceSize offset = 0;
 		vkCmdBindVertexBuffers(command_buffer, /*first_binding*/ 0, /*binding_count*/ 1, &vertex_buffer, &offset);
@@ -925,9 +928,25 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
 
+		vkCmdEndRenderPass(command_buffer);
+
 		result = vkEndCommandBuffer(command_buffer);
 		assert(result == VK_SUCCESS);
 	}
+
+	VkFenceCreateInfo fence_info = {};
+	fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fence_info.pNext = nullptr;
+	fence_info.flags = 0;
+
+	vkCreateFence(graphics_state->device, &fence_info, /*allocator*/ nullptr, &graphics_state->fence);
+
+	VkSemaphoreCreateInfo semaphore_info = {};
+	semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	semaphore_info.pNext = nullptr;
+	semaphore_info.flags = 0;
+
+	vkCreateSemaphore(graphics_state->device, &semaphore_info, /*allocator*/ nullptr, &graphics_state->semaphore);
 }
 
 void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3f cube_position)
@@ -944,5 +963,43 @@ void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3
 	Matrix_4x4 mvp_matrix;
 	matrix_4x4_mul(&mvp_matrix, &graphics_state->projection_matrix, &model_view_matrix);
 
-	
+	float* ubo_data;
+	vkMapMemory(graphics_state->device, graphics_state->ubo_memory, /*offset*/ 0, graphics_state->ubo_size, /*flags*/ 0, (void**)&ubo_data);
+	// todo(jbr) copy matrix
+	vkUnmapMemory(graphics_state->device, graphics_state->ubo_memory);
+
+	uint32 image_index;
+	VkResult result = vkAcquireNextImageKHR(graphics_state->device, graphics_state->swapchain, /*timeout*/ (uint64)-1, graphics_state->semaphore, graphics_state->fence, &image_index);
+	assert(result == VK_SUCCESS);
+
+	VkSubmitInfo submit_info = {};
+	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submit_info.pNext = nullptr;
+	submit_info.waitSemaphoreCount = 1;
+	submit_info.pWaitSemaphores = &graphics_state->semaphore;
+	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	submit_info.pWaitDstStageMask = &wait_stage;
+	submit_info.commandBufferCount = 1;
+	submit_info.pCommandBuffers = &graphics_state->command_buffers[image_index];
+	submit_info.signalSemaphoreCount = 0;
+	submit_info.pSignalSemaphores = nullptr;
+
+	result = vkQueueSubmit(graphics_state->graphics_queue, /*submit_count*/ 1, &submit_info, graphics_state->fence);
+	assert(result == VK_SUCCESS);
+
+	result = vkWaitForFences(graphics_state->device, /*fence_count*/ 1, &graphics_state->fence, /*wait_all*/ true, /*timeout*/ (uint64)-1);
+	assert(result == VK_SUCCESS);
+
+	VkPresentInfoKHR present_info = {};
+	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	present_info.pNext = nullptr;
+	present_info.waitSemaphoreCount = 0;
+	present_info.pWaitSemaphores = nullptr;
+	present_info.swapchainCount = 1;
+	present_info.pSwapchains = &graphics_state->swapchain;
+	present_info.pImageIndices = &image_index;
+	present_info.pResults = nullptr;
+
+	result = vkQueuePresentKHR(graphics_state->present_queue, &present_info);
+	assert(result == VK_SUCCESS);
 }

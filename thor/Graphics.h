@@ -11,6 +11,11 @@ struct Graphics_State
 	struct VkInstance_T* instance;
 	struct VkPhysicalDevice_T* gpu;
 	struct VkDevice_T* device;
+	struct VkSwapchainKHR_T* swapchain;
+	struct VkQueue_T* graphics_queue;
+	struct VkQueue_T* present_queue;
+	struct VkFence_T* fence;
+	struct VkSemaphore_T* semaphore;
 	Matrix_4x4 projection_matrix;
 	struct VkCommandBuffer_T** command_buffers;
 };
