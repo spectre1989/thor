@@ -16,8 +16,9 @@ struct Graphics_State
 	struct VkQueue_T* present_queue;
 	struct VkFence_T* fence;
 	struct VkSemaphore_T* semaphore;
-	Matrix_4x4 projection_matrix;
 	struct VkCommandBuffer_T** command_buffers;
+	struct VkDeviceMemory_T* uniform_buffer_memory;
+	Matrix_4x4 projection_matrix;
 };
 
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, struct Linear_Allocator* allocator, Linear_Allocator* temp_allocator);

@@ -153,12 +153,18 @@ void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3
 	rotation.m11 = view_right.x;
 	rotation.m12 = view_right.y;
 	rotation.m13 = view_right.z;
+	rotation.m14 = 0.0f;
 	rotation.m21 = view_forward.x;
 	rotation.m22 = view_forward.y;
 	rotation.m23 = view_forward.z;
+	rotation.m24 = 0.0f;
 	rotation.m31 = view_up.x;
 	rotation.m32 = view_up.y;
 	rotation.m33 = view_up.z;
+	rotation.m34 = 0.0f;
+	rotation.m41 = 0.0f;
+	rotation.m42 = 0.0f;
+	rotation.m43 = 0.0f;
 	rotation.m44 = 1.0f;
 
 	matrix_4x4_mul(matrix, &rotation, &translation);

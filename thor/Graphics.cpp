@@ -454,28 +454,13 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	constexpr uint32 c_ubo_size = c_matrix_count * 4 * 4 * sizeof(float32);
 
 	VkBuffer uniform_buffer;
-	VkDeviceMemory uniform_buffer_memory;
 	create_buffer(graphics_state->device, 
 		&gpu_memory_properties, 
 		c_ubo_size, 
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
 		&uniform_buffer, 
-		&uniform_buffer_memory);
-
-	float* matrix_data;
-	result = vkMapMemory(graphics_state->device, uniform_buffer_memory, /*offset*/ 0, c_ubo_size, /*flags*/ 0, (void**)&matrix_data);
-	assert(result == VK_SUCCESS);
-
-	for (int32 matrix_i = 0; matrix_i < c_matrix_count; ++matrix_i)
-	{
-		for (int32 component_i = 0; component_i < 16; ++component_i)
-		{
-			matrix_data[component_i] = 0.0f;
-		}
-	}
-
-	vkUnmapMemory(graphics_state->device, uniform_buffer_memory);
+		&graphics_state->uniform_buffer_memory);
 
 	VkDescriptorSetLayoutBinding layout_binding = {};
 	layout_binding.binding = 0;
@@ -658,15 +643,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	float* vbo_data;
 	result = vkMapMemory(graphics_state->device, vertex_buffer_memory, /*offset*/ 0, c_vbo_size, /*flags*/ 0, (void**)&vbo_data);
 	assert(result == VK_SUCCESS);
-
-	float* src_v_iter = vertices;
-	float* src_v_end = vertices + c_vertex_float32_count;
-	float* dst_v_iter = vbo_data;
-	for (; src_v_iter != src_v_end; ++src_v_iter, ++dst_v_iter)
-	{
-		*dst_v_iter = *src_v_iter;
-	}
-
+	memcpy(vbo_data, vertices, c_vbo_size);
 	vkUnmapMemory(graphics_state->device, vertex_buffer_memory);
 
 	constexpr int32 c_index_count = 6;
@@ -689,15 +666,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	uint16* ibo_data;
 	result = vkMapMemory(graphics_state->device, index_buffer_memory, /*offset*/ 0, c_ibo_size, /*flags*/ 0, (void**)&ibo_data);
 	assert(result == VK_SUCCESS);
-
-	uint16* src_i_iter = indicies;
-	uint16* src_i_end = indicies + c_index_count;
-	uint16* dst_i_iter = ibo_data;
-	for (; src_i_iter != src_i_end; ++src_i_iter, ++dst_i_iter)
-	{
-		*dst_i_iter = *src_i_iter;
-	}
-
+	memcpy(ibo_data, indicies, c_ibo_size);
 	vkUnmapMemory(graphics_state->device, index_buffer_memory);
 
 	constexpr uint32 c_num_shader_stages = 2;
@@ -964,12 +933,13 @@ void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3
 	matrix_4x4_mul(&mvp_matrix, &graphics_state->projection_matrix, &model_view_matrix);
 
 	float* ubo_data;
-	vkMapMemory(graphics_state->device, graphics_state->ubo_memory, /*offset*/ 0, graphics_state->ubo_size, /*flags*/ 0, (void**)&ubo_data);
-	// todo(jbr) copy matrix
-	vkUnmapMemory(graphics_state->device, graphics_state->ubo_memory);
+	VkResult result = vkMapMemory(graphics_state->device, graphics_state->uniform_buffer_memory, /*offset*/ 0, sizeof(float32) * 16, /*flags*/ 0, (void**)&ubo_data);
+	assert(result == VK_SUCCESS);
+	memcpy(ubo_data, &mvp_matrix, sizeof(float32) * 16);
+	vkUnmapMemory(graphics_state->device, graphics_state->uniform_buffer_memory);
 
 	uint32 image_index;
-	VkResult result = vkAcquireNextImageKHR(graphics_state->device, graphics_state->swapchain, /*timeout*/ (uint64)-1, graphics_state->semaphore, graphics_state->fence, &image_index);
+	result = vkAcquireNextImageKHR(graphics_state->device, graphics_state->swapchain, /*timeout*/ (uint64)-1, graphics_state->semaphore, /*fence*/ nullptr, &image_index);
 	assert(result == VK_SUCCESS);
 
 	VkSubmitInfo submit_info = {};
@@ -977,7 +947,7 @@ void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3
 	submit_info.pNext = nullptr;
 	submit_info.waitSemaphoreCount = 1;
 	submit_info.pWaitSemaphores = &graphics_state->semaphore;
-	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 	submit_info.pWaitDstStageMask = &wait_stage;
 	submit_info.commandBufferCount = 1;
 	submit_info.pCommandBuffers = &graphics_state->command_buffers[image_index];
@@ -988,6 +958,9 @@ void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3
 	assert(result == VK_SUCCESS);
 
 	result = vkWaitForFences(graphics_state->device, /*fence_count*/ 1, &graphics_state->fence, /*wait_all*/ true, /*timeout*/ (uint64)-1);
+	assert(result == VK_SUCCESS);
+
+	result = vkResetFences(graphics_state->device, /*fence_count*/ 1, &graphics_state->fence);
 	assert(result == VK_SUCCESS);
 
 	VkPresentInfoKHR present_info = {};
