@@ -1,4 +1,5 @@
 ﻿#include "Bin_File.h"
+#include "Core.h"
 #include "File.h"
 #include "Geo_File.h"
 #include "Graphics.h"
@@ -7,6 +8,14 @@
 #include "String.h"
 #include <Windows.h>
 
+
+
+struct Input_State
+{
+	bool32 keys[256];
+};
+
+static Input_State g_input_state;
 
 
 static void on_pigg_file_found(const char* path, void* state)
@@ -36,6 +45,19 @@ static void on_geo_file_found(const char* path, void* state)
 
 static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_param, LPARAM l_param)
 {
+	switch (msg)
+	{
+	case WM_KEYDOWN:
+		g_input_state.keys[(int32)w_param] = 1;
+		return 0;
+		break;
+
+	case WM_KEYUP:
+		g_input_state.keys[(int32)w_param] = 0;
+		return 0;
+		break;
+	}
+
 	return DefWindowProcA(window_handle, msg, w_param, l_param);
 }
 
@@ -119,6 +141,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
 		graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
 
+		Vec_3f camera_position = vec_3f(0.0f, 0.0f, 0.0f);
+		Vec_3f camera_forward = vec_3f(0.0f, 1.0f, 0.0f);
+		Vec_3f camera_right = vec_3f(1.0f, 0.0f, 0.0f);
+		Matrix_4x4 view_matrix;
+
 		while (true)
 		{
 			MSG msg;
@@ -128,7 +155,36 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 				DispatchMessageA(&msg);
 			}
 
-			graphics_draw(graphics_state, /*camera_position*/ vec_3f(0.0f, 0.0f, 0.0f), /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
+			float32 speed = 0.01f;
+			if (g_input_state.keys['W'])
+			{
+				camera_position = vec_3f_add(camera_position, vec_3f_mul(camera_forward, speed));
+			}
+			if (g_input_state.keys['S'])
+			{
+				camera_position = vec_3f_sub(camera_position, vec_3f_mul(camera_forward, speed));
+			}
+			if (g_input_state.keys['A'])
+			{
+				camera_position = vec_3f_sub(camera_position, vec_3f_mul(camera_right, speed));
+			}
+			if (g_input_state.keys['D'])
+			{
+				camera_position = vec_3f_add(camera_position, vec_3f_mul(camera_right, speed));
+			}
+			if (g_input_state.keys['E'])
+			{
+				camera_position = vec_3f_add(camera_position, vec_3f(0.0f, 0.0f, speed));
+			}
+			if (g_input_state.keys['Q'])
+			{
+				camera_position = vec_3f_sub(camera_position, vec_3f(0.0f, 0.0f, speed));
+			}
+
+
+			matrix_4x4_lookat(&view_matrix, camera_position, camera_forward, /*up*/ vec_3f(0.0f, 0.0f, 1.0f));
+
+			graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
 		}
 	}
 

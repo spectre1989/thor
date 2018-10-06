@@ -22,4 +22,4 @@ struct Graphics_State
 };
 
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, struct Linear_Allocator* allocator, Linear_Allocator* temp_allocator);
-void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3f cube_position);
+void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Vec_3f cube_position);

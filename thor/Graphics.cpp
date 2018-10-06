@@ -830,7 +830,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		/*fov_y*/ 90.0f,
 		/*aspect_ratio*/ swapchain_info.imageExtent.width / (float32)swapchain_info.imageExtent.height,
 		/*near_plane*/ 0.1f,
-		/*far_plane*/ 10.0f);
+		/*far_plane*/ 1000.0f);
 
 	VkCommandPoolCreateInfo command_pool_info = {};
 	command_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -918,16 +918,13 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	vkCreateSemaphore(graphics_state->device, &semaphore_info, /*allocator*/ nullptr, &graphics_state->semaphore);
 }
 
-void graphics_draw(Graphics_State* graphics_state, Vec_3f camera_position, Vec_3f cube_position)
+void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Vec_3f cube_position)
 {
-	Matrix_4x4 view_matrix;
-	matrix_4x4_lookat(&view_matrix, camera_position, cube_position, /*up*/ vec_3f(0.0f, 0.0f, 1.0f));
-
-	Matrix_4x4 cube_model_matrix;
-	matrix_4x4_translation(&cube_model_matrix, cube_position);
+	Matrix_4x4 model_matrix;
+	matrix_4x4_translation(&model_matrix, cube_position);
 
 	Matrix_4x4 model_view_matrix;
-	matrix_4x4_mul(&model_view_matrix, &view_matrix, &cube_model_matrix);
+	matrix_4x4_mul(&model_view_matrix, view_matrix, &model_matrix);
 
 	Matrix_4x4 mvp_matrix;
 	matrix_4x4_mul(&mvp_matrix, &graphics_state->projection_matrix, &model_view_matrix);
