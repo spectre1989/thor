@@ -50,6 +50,12 @@ Vec_3f vec_3f_cross(Vec_3f a, Vec_3f b)
 	return vec_3f((a.y * b.z) - (a.z * b.y), (a.z * b.x) - (a.x * b.z), (a.x * b.y) - (a.y * b.x));
 }
 
+Vec_3f vec_3f_lerp(Vec_3f a, Vec_3f b, float32 t)
+{
+	Vec_3f delta = vec_3f_sub(b, a);
+	return vec_3f_add(a, vec_3f_mul(delta, t));
+}
+
 
 void matrix_4x4_projection(
 	Matrix_4x4* matrix,
