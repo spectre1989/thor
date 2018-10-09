@@ -37,3 +37,6 @@ void matrix_4x4_projection(Matrix_4x4* matrix, float32 fov_y, float32 aspect_rat
 void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation);
 void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b);
 void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up);
+void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r);
+void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r);
+void matrix_4x4_rotation_z(Matrix_4x4* matrix, float32 r);
