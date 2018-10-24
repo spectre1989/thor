@@ -124,21 +124,21 @@ void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r)
 	matrix->m44 = 1.0f;
 }
 
-void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r) // todo(jbr) this is just a copy of z as a stub
+void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r)
 {
 	float32 cr = cosf(r);
 	float32 sr = sinf(r);
 	matrix->m11 = cr;
-	matrix->m21 = sr;
-	matrix->m31 = 0.0f;
+	matrix->m21 = 0.0f;
+	matrix->m31 = -sr;
 	matrix->m41 = 0.0f;
-	matrix->m12 = -sr;
-	matrix->m22 = cr;
+	matrix->m12 = 0.0f;
+	matrix->m22 = 1.0f;
 	matrix->m32 = 0.0f;
 	matrix->m42 = 0.0f;
-	matrix->m13 = 0.0f;
+	matrix->m13 = sr;
 	matrix->m23 = 0.0f;
-	matrix->m33 = 1.0f;
+	matrix->m33 = cr;
 	matrix->m43 = 0.0f;
 	matrix->m14 = 0.0f;
 	matrix->m24 = 0.0f;
