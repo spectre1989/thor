@@ -16,4 +16,9 @@ typedef int64_t int64;
 typedef float float32;
 
 
-#define assert(x) if(!(x)) {int* p = 0; *p = 0;}
+#if _DEBUG
+#include <Windows.h>
+#define assert(x) if(!(x)) {DebugBreak();}
+#else
+#define assert(x)
+#endif // _DEBUG

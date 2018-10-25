@@ -4,6 +4,11 @@
 
 
 
+constexpr float32 c_pi = 3.14159265f;
+constexpr float32 c_deg_to_rad = c_pi / 180.0f;
+constexpr float32 c_rad_to_deg = 1 / c_deg_to_rad;
+
+
 struct Vec_3f
 {
 	float32 x, y, z;
@@ -35,7 +40,8 @@ Vec_3f vec_3f_lerp(Vec_3f a, Vec_3f b, float32 t);
 
 void matrix_4x4_projection(Matrix_4x4* matrix, float32 fov_y, float32 aspect_ratio, float32 near_plane, float32 far_plane);
 void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation);
-void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b);
+void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b); // todo(jbr) should this be changed to be (a, b, result)? should really decide on a convention of param order
+Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v);
 void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up);
 void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r);
 void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r);

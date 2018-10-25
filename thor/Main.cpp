@@ -94,8 +94,6 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
 
 	Vec_3f camera_position = vec_3f(0.0f, 0.0f, 0.0f);
-	Vec_3f camera_forward = vec_3f(0.0f, 0.0f, 1.0f);
-	Vec_3f camera_right = vec_3f(1.0f, 0.0f, 0.0f);
 	float32 camera_pitch = 0.0f;
 	float32 camera_yaw = 0.0f;
 	Matrix_4x4 view_matrix;
@@ -113,23 +111,50 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			DispatchMessageA(&msg);
 		}
 
+		if (g_input_state.keys['K'])
+		{
+			camera_yaw += c_target_frame_dt;
+		}
+		if (g_input_state.keys['L'])
+		{
+			camera_yaw -= c_target_frame_dt;
+		}
+		if (g_input_state.keys['I'])
+		{
+			camera_pitch += c_target_frame_dt;
+		}
+		if (g_input_state.keys['O'])
+		{
+			camera_pitch -= c_target_frame_dt;
+		}
+
+		Matrix_4x4 camera_pitch_matrix;
+		matrix_4x4_rotation_x(&camera_pitch_matrix, camera_pitch);
+		Matrix_4x4 camera_yaw_matrix;
+		matrix_4x4_rotation_z(&camera_yaw_matrix, camera_yaw);
+		Matrix_4x4 camera_matrix;
+		matrix_4x4_mul(&camera_matrix, &camera_pitch_matrix, &camera_yaw_matrix);
+
+		Vec_3f camera_right = matrix_4x4_mul_direction(&camera_matrix, vec_3f(1.0f, 0.0f, 0.0f));
+		Vec_3f camera_forward = matrix_4x4_mul_direction(&camera_matrix, vec_3f(0.0f, 1.0f, 0.0f));
+		
 		constexpr float32 c_camera_speed = 5.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
 		if (g_input_state.keys['W'])
 		{
-			target_camera_velocity = vec_3f_mul(camera_forward, c_camera_speed);
+			target_camera_velocity = vec_3f_add(target_camera_velocity, camera_forward);
 		}
 		if (g_input_state.keys['S'])
 		{
-			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f_mul(camera_forward, c_camera_speed));
+			target_camera_velocity = vec_3f_sub(target_camera_velocity, camera_forward);
 		}
 		if (g_input_state.keys['A'])
 		{
-			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f_mul(camera_right, c_camera_speed));
+			target_camera_velocity = vec_3f_sub(target_camera_velocity, camera_right);
 		}
 		if (g_input_state.keys['D'])
 		{
-			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f_mul(camera_right, c_camera_speed));
+			target_camera_velocity = vec_3f_add(target_camera_velocity, camera_right);
 		}
 		if (g_input_state.keys['E'])
 		{
@@ -139,32 +164,16 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		{
 			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, 0.0f, c_camera_speed));
 		}
-		if (g_input_state.keys['K'])
-		{
-			camera_yaw += c_target_frame_dt;
-		}
-		if (g_input_state.keys['L'])
-		{
-			camera_yaw -= c_target_frame_dt;
-		}
-
+		
 		target_camera_velocity = vec_3f_mul(vec_3f_normalised(target_camera_velocity), c_camera_speed);
-
+		
 		constexpr float32 c_camera_smoothing_factor = 12.0f;
 		float32 smoothing_lerp_t = exp2(-c_camera_smoothing_factor * c_target_frame_dt);
 		camera_velocity = vec_3f_lerp(target_camera_velocity, camera_velocity, smoothing_lerp_t);
 
 		camera_position = vec_3f_add(camera_position, vec_3f_mul(camera_velocity, c_target_frame_dt));
 
-		Matrix_4x4 camera_pitch_matrix;
-		matrix_4x4_rotation_x(&camera_pitch_matrix, -camera_pitch);
-		Matrix_4x4 camera_yaw_matrix;
-		matrix_4x4_rotation_z(&camera_yaw_matrix, -camera_yaw);
-		Matrix_4x4 pitch_and_yaw;
-		matrix_4x4_mul(&pitch_and_yaw, &camera_yaw_matrix, &camera_pitch_matrix);
-		Matrix_4x4 camera_translation_matrix;
-		matrix_4x4_translation(&camera_translation_matrix, vec_3f_mul(camera_position, -1.0f));
-		matrix_4x4_mul(&view_matrix, &camera_translation_matrix, &pitch_and_yaw);
+		matrix_4x4_lookat(&view_matrix, camera_position, vec_3f_add(camera_position, camera_forward), vec_3f(0.0f, 0.0f, 1.0f));
 
 		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
 

@@ -189,6 +189,13 @@ void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b)
 	result->m44 = (a->m41 * b->m14) + (a->m42 * b->m24) + (a->m43 * b->m34) + (a->m44 * b->m44);
 }
 
+Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v)
+{
+	return vec_3f(	(v.x * matrix->m11) + (v.y * matrix->m12) + (v.z * matrix->m13),
+					(v.x * matrix->m21) + (v.y * matrix->m22) + (v.z * matrix->m23),
+					(v.x * matrix->m31) + (v.y * matrix->m32) + (v.z * matrix->m33));
+}
+
 void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up)
 {
 	Matrix_4x4 translation;
@@ -200,20 +207,20 @@ void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_
 
 	Matrix_4x4 rotation;
 	rotation.m11 = view_right.x;
-	rotation.m12 = view_right.y;
-	rotation.m13 = view_right.z;
-	rotation.m14 = 0.0f;
-	rotation.m21 = forward.x;
-	rotation.m22 = forward.y;
-	rotation.m23 = forward.z;
-	rotation.m24 = 0.0f;
-	rotation.m31 = view_up.x;
-	rotation.m32 = view_up.y;
-	rotation.m33 = view_up.z;
-	rotation.m34 = 0.0f;
+	rotation.m21 = view_right.y;
+	rotation.m31 = view_right.z;
 	rotation.m41 = 0.0f;
+	rotation.m12 = forward.x;
+	rotation.m22 = forward.y;
+	rotation.m32 = forward.z;
 	rotation.m42 = 0.0f;
+	rotation.m13 = view_up.x;
+	rotation.m23 = view_up.y;
+	rotation.m33 = view_up.z;
 	rotation.m43 = 0.0f;
+	rotation.m14 = 0.0f;
+	rotation.m24 = 0.0f;
+	rotation.m34 = 0.0f;
 	rotation.m44 = 1.0f;
 
 	matrix_4x4_mul(matrix, &rotation, &translation);

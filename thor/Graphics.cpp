@@ -827,7 +827,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 	matrix_4x4_projection(
 		&graphics_state->projection_matrix,
-		/*fov_y*/ 90.0f,
+		/*fov_y*/ 60.0f * c_deg_to_rad,
 		/*aspect_ratio*/ swapchain_info.imageExtent.width / (float32)swapchain_info.imageExtent.height,
 		/*near_plane*/ 0.1f,
 		/*far_plane*/ 1000.0f);
