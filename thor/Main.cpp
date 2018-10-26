@@ -127,13 +127,16 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		{
 			camera_pitch -= c_target_frame_dt;
 		}
+		constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
+		constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
+		camera_pitch = clamp_f32(camera_pitch, min_pitch, max_pitch);
 
 		Matrix_4x4 camera_pitch_matrix;
 		matrix_4x4_rotation_x(&camera_pitch_matrix, camera_pitch);
 		Matrix_4x4 camera_yaw_matrix;
 		matrix_4x4_rotation_z(&camera_yaw_matrix, camera_yaw);
 		Matrix_4x4 camera_matrix;
-		matrix_4x4_mul(&camera_matrix, &camera_pitch_matrix, &camera_yaw_matrix);
+		matrix_4x4_mul(&camera_matrix, &camera_yaw_matrix, &camera_pitch_matrix);
 
 		Vec_3f camera_right = matrix_4x4_mul_direction(&camera_matrix, vec_3f(1.0f, 0.0f, 0.0f));
 		Vec_3f camera_forward = matrix_4x4_mul_direction(&camera_matrix, vec_3f(0.0f, 1.0f, 0.0f));
@@ -173,7 +176,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		camera_position = vec_3f_add(camera_position, vec_3f_mul(camera_velocity, c_target_frame_dt));
 
-		matrix_4x4_lookat(&view_matrix, camera_position, vec_3f_add(camera_position, camera_forward), vec_3f(0.0f, 0.0f, 1.0f));
+		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, vec_3f(0.0f, 0.0f, 1.0f));
 
 		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
 

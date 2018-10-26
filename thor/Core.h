@@ -17,8 +17,7 @@ typedef float float32;
 
 
 #if _DEBUG
-#include <Windows.h>
-#define assert(x) if(!(x)) {DebugBreak();}
+#define assert(x) if(!(x)) {__debugbreak();}
 #else
 #define assert(x)
 #endif // _DEBUG

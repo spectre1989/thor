@@ -42,6 +42,7 @@ void matrix_4x4_projection(Matrix_4x4* matrix, float32 fov_y, float32 aspect_rat
 void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation);
 void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b); // todo(jbr) should this be changed to be (a, b, result)? should really decide on a convention of param order
 Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v);
+void matrix_4x4_camera(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up);
 void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up);
 void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r);
 void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r);

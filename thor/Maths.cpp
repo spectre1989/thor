@@ -196,32 +196,32 @@ Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v)
 					(v.x * matrix->m31) + (v.y * matrix->m32) + (v.z * matrix->m33));
 }
 
-void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up)
+void matrix_4x4_camera(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up)
 {
-	Matrix_4x4 translation;
-	matrix_4x4_translation(&translation, vec_3f_mul(position, -1.0f));
-
 	Vec_3f project_up_onto_forward = vec_3f_mul(forward, vec_3f_dot(up, forward));
 	Vec_3f view_up = vec_3f_normalised(vec_3f_sub(up, project_up_onto_forward));
 	Vec_3f view_right = vec_3f_cross(forward, view_up);
+	Vec_3f translation = vec_3f_mul(position, -1.0f);
 
-	Matrix_4x4 rotation;
-	rotation.m11 = view_right.x;
-	rotation.m21 = view_right.y;
-	rotation.m31 = view_right.z;
-	rotation.m41 = 0.0f;
-	rotation.m12 = forward.x;
-	rotation.m22 = forward.y;
-	rotation.m32 = forward.z;
-	rotation.m42 = 0.0f;
-	rotation.m13 = view_up.x;
-	rotation.m23 = view_up.y;
-	rotation.m33 = view_up.z;
-	rotation.m43 = 0.0f;
-	rotation.m14 = 0.0f;
-	rotation.m24 = 0.0f;
-	rotation.m34 = 0.0f;
-	rotation.m44 = 1.0f;
+	matrix->m11 = view_right.x;
+	matrix->m21 = forward.x;
+	matrix->m31 = view_up.x;
+	matrix->m41 = 0.0f;
+	matrix->m12 = view_right.y;
+	matrix->m22 = forward.y;
+	matrix->m32 = view_up.y;
+	matrix->m42 = 0.0f;
+	matrix->m13 = view_right.z;
+	matrix->m23 = forward.z;	
+	matrix->m33 = view_up.z;
+	matrix->m43 = 0.0f;
+	matrix->m14 = (view_right.x * translation.x) + (view_right.y * translation.y) + (view_right.z * translation.z);
+	matrix->m24 = (forward.x * translation.x) + (forward.y * translation.y) + (forward.z * translation.z);
+	matrix->m34 = (view_up.x * translation.x) + (view_up.y * translation.y) + (view_up.z * translation.z);
+	matrix->m44 = 1.0f;
+}
 
-	matrix_4x4_mul(matrix, &rotation, &translation);
+void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up)
+{
+	matrix_4x4_camera(matrix, position, vec_3f_normalised(vec_3f_sub(target, position)), up);
 }
