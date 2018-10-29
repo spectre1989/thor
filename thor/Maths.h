@@ -14,6 +14,11 @@ struct Vec_3f
 	float32 x, y, z;
 };
 
+struct Quat
+{
+	float32 zy, xz, yx, scalar;
+};
+
 struct Matrix_4x4
 {
 	// m11 m12 m13 m14
@@ -39,6 +44,11 @@ Vec_3f vec_3f_normalised(Vec_3f v);
 float vec_3f_dot(Vec_3f a, Vec_3f b);
 Vec_3f vec_3f_cross(Vec_3f a, Vec_3f b);
 Vec_3f vec_3f_lerp(Vec_3f a, Vec_3f b, float32 t);
+
+Quat quat(float32 zy, float32 xz, float32 yx, float32 scalar);
+Quat quat_identity();
+Quat quat_angle_axis(Vec_3f axis, float32 angle);
+Vec_3f quat_mul(Quat q, Vec_3f v);
 
 void matrix_4x4_projection(Matrix_4x4* matrix, float32 fov_y, float32 aspect_ratio, float32 near_plane, float32 far_plane);
 void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation);

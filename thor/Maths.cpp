@@ -23,6 +23,7 @@ float32 f32_clamp(float32 f, float32 min, float32 max)
 	}
 }
 
+
 Vec_3f vec_3f(float32 x, float32 y, float32 z)
 {
 	Vec_3f v;
@@ -73,6 +74,40 @@ Vec_3f vec_3f_lerp(Vec_3f a, Vec_3f b, float32 t)
 {
 	Vec_3f delta = vec_3f_sub(b, a);
 	return vec_3f_add(a, vec_3f_mul(delta, t));
+}
+
+
+Quat quat(float32 zy, float32 xz, float32 yx, float32 scalar)
+{
+	Quat q;
+	q.zy = zy;
+	q.xz = xz;
+	q.yx = yx;
+	q.scalar = scalar;
+
+	return q;
+}
+
+Quat quat_identity()
+{
+	return quat(0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+Quat quat_angle_axis(Vec_3f axis, float32 angle)
+{
+	float32 theta_div_2 = angle * 0.5f;
+	float32 sin_theta_div_2 = sinf(theta_div_2);
+	return quat(axis.x * sin_theta_div_2, axis.y * sin_theta_div_2, axis.z * sin_theta_div_2, cosf(theta_div_2));
+}
+
+Vec_3f quat_mul(Quat q, Vec_3f v)
+{
+	float32 yx_sq = q.yx * q.yx;
+	float32 scalar_sq = q.scalar * q.scalar;
+
+	return vec_3f((-yx_sq * v.x) + (scalar_sq * v.x), 
+				  (-yx_sq * v.y) + (scalar_sq * v.y), 
+				  (yx_sq * v.z) + (scalar_sq * v.z));
 }
 
 

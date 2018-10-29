@@ -140,6 +140,10 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		Vec_3f camera_right = matrix_4x4_mul_direction(&camera_matrix, vec_3f(1.0f, 0.0f, 0.0f));
 		Vec_3f camera_forward = matrix_4x4_mul_direction(&camera_matrix, vec_3f(0.0f, 1.0f, 0.0f));
+
+		Quat camera_rotation = quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw);
+		camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
+		camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
 		
 		constexpr float32 c_camera_speed = 5.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
