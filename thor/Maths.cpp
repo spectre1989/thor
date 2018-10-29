@@ -105,9 +105,9 @@ Vec_3f quat_mul(Quat q, Vec_3f v)
 	float32 yx_sq = q.yx * q.yx;
 	float32 scalar_sq = q.scalar * q.scalar;
 
-	return vec_3f((-yx_sq * v.x) + (scalar_sq * v.x), 
-				  (-yx_sq * v.y) + (scalar_sq * v.y), 
-				  (yx_sq * v.z) + (scalar_sq * v.z));
+	return vec_3f((yx_sq * v.x) - (q.scalar * q.yx * v.y) - (scalar_sq * v.x) - (q.scalar * q.yx * v.y),
+		(2 * q.scalar * q.yx * v.x) + (scalar_sq * v.y) - (yx_sq * v.y),
+		0.0f);
 }
 
 
