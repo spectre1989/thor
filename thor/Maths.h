@@ -29,6 +29,8 @@ struct Matrix_4x4
 };
 
 
+float32 f32_clamp(float32 f, float32 min, float32 max);
+
 Vec_3f vec_3f(float32 x, float32 y, float32 z);
 Vec_3f vec_3f_add(Vec_3f a, Vec_3f b);
 Vec_3f vec_3f_sub(Vec_3f a, Vec_3f b);

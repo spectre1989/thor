@@ -129,7 +129,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		}
 		constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
 		constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
-		camera_pitch = clamp_f32(camera_pitch, min_pitch, max_pitch);
+		camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
 
 		Matrix_4x4 camera_pitch_matrix;
 		matrix_4x4_rotation_x(&camera_pitch_matrix, camera_pitch);
