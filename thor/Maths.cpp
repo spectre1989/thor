@@ -95,9 +95,9 @@ Quat quat_identity()
 
 Quat quat_angle_axis(Vec_3f axis, float32 angle)
 {
-	float32 theta_div_2 = angle * 0.5f;
-	float32 sin_theta_div_2 = sinf(theta_div_2);
-	return quat(axis.x * sin_theta_div_2, axis.y * sin_theta_div_2, axis.z * sin_theta_div_2, cosf(theta_div_2));
+	float32 half_theta = angle * 0.5f;
+	float32 sin_half_theta = sinf(half_theta);
+	return quat(axis.x * sin_half_theta, axis.y * sin_half_theta, axis.z * sin_half_theta, cosf(half_theta));
 }
 
 Vec_3f quat_mul(Quat q, Vec_3f v)
