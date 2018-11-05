@@ -102,12 +102,11 @@ Quat quat_angle_axis(Vec_3f axis, float32 angle)
 
 Vec_3f quat_mul(Quat q, Vec_3f v)
 {
-	float32 yx_sq = q.yx * q.yx;
-	float32 scalar_sq = q.scalar * q.scalar;
+	// todo(jbr) simplify
 
-	return vec_3f((yx_sq * v.x) - (q.scalar * q.yx * v.y) - (scalar_sq * v.x) - (q.scalar * q.yx * v.y),
-		(2 * q.scalar * q.yx * v.x) + (scalar_sq * v.y) - (yx_sq * v.y),
-		0.0f);
+	return vec_3f((2.0f*((q.scalar*((q.xz*v.z) - (q.yx*v.y))) + (q.zy*((q.xz*v.y) + (q.yx*v.z))))) + (v.x*((q.scalar*q.scalar) + (q.zy*q.zy) - (q.xz*q.xz) - (q.yx*q.yx))),
+				  (2.0f * ((q.scalar*((q.yx*v.x) - (q.zy*v.z))) + (q.xz*((q.zy*v.x) + (q.yx*v.z))))) + (v.y*((q.scalar*q.scalar) - (q.zy*q.zy) + (q.xz*q.xz) - (q.yx*q.yx))),
+				  (2.0f*(v.x*((q.zy*q.yx) - (q.scalar*q.xz)) + (v.y*((q.scalar*q.zy) + (q.xz*q.yx))))) + (v.z*((q.scalar*q.scalar) - (q.zy*q.zy) - (q.xz*q.xz) + (q.yx*q.yx))));
 }
 
 
