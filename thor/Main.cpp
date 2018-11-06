@@ -111,6 +111,9 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			DispatchMessageA(&msg);
 		}
 
+		static int p = 0;
+		static bool use_quat = false;
+
 		if (g_input_state.keys['K'])
 		{
 			camera_yaw += c_target_frame_dt;
@@ -127,6 +130,18 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		{
 			camera_pitch -= c_target_frame_dt;
 		}
+		if (g_input_state.keys['P'])
+		{
+			if (!p)
+			{
+				p = 1;
+				use_quat = !use_quat;
+			}
+		}
+		else
+		{
+			p = 0;
+		}
 		constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
 		constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
 		camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
@@ -141,9 +156,13 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		Vec_3f camera_right = matrix_4x4_mul_direction(&camera_matrix, vec_3f(1.0f, 0.0f, 0.0f));
 		Vec_3f camera_forward = matrix_4x4_mul_direction(&camera_matrix, vec_3f(0.0f, 1.0f, 0.0f));
 
-		Quat camera_rotation = quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw);
-		camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
-		camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
+		Quat camera_rotation = quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch);
+		camera_rotation = quat_mul(camera_rotation, quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw));
+		if (use_quat)
+		{
+			camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
+			camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
+		}
 		
 		constexpr float32 c_camera_speed = 5.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);

@@ -49,6 +49,7 @@ Quat quat(float32 zy, float32 xz, float32 yx, float32 scalar);
 Quat quat_identity();
 Quat quat_angle_axis(Vec_3f axis, float32 angle);
 Vec_3f quat_mul(Quat q, Vec_3f v);
+Quat quat_mul(Quat a, Quat b);
 
 void matrix_4x4_projection(Matrix_4x4* matrix, float32 fov_y, float32 aspect_ratio, float32 near_plane, float32 far_plane);
 void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation);

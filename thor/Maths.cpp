@@ -105,8 +105,16 @@ Vec_3f quat_mul(Quat q, Vec_3f v)
 	// todo(jbr) simplify
 
 	return vec_3f((2.0f*((q.scalar*((q.xz*v.z) - (q.yx*v.y))) + (q.zy*((q.xz*v.y) + (q.yx*v.z))))) + (v.x*((q.scalar*q.scalar) + (q.zy*q.zy) - (q.xz*q.xz) - (q.yx*q.yx))),
-				  (2.0f * ((q.scalar*((q.yx*v.x) - (q.zy*v.z))) + (q.xz*((q.zy*v.x) + (q.yx*v.z))))) + (v.y*((q.scalar*q.scalar) - (q.zy*q.zy) + (q.xz*q.xz) - (q.yx*q.yx))),
+				  (2.0f*((q.scalar*((q.yx*v.x) - (q.zy*v.z))) + (q.xz*((q.zy*v.x) + (q.yx*v.z))))) + (v.y*((q.scalar*q.scalar) - (q.zy*q.zy) + (q.xz*q.xz) - (q.yx*q.yx))),
 				  (2.0f*(v.x*((q.zy*q.yx) - (q.scalar*q.xz)) + (v.y*((q.scalar*q.zy) + (q.xz*q.yx))))) + (v.z*((q.scalar*q.scalar) - (q.zy*q.zy) - (q.xz*q.xz) + (q.yx*q.yx))));
+}
+
+Quat quat_mul(Quat a, Quat b)
+{
+	return quat((b.zy*a.scalar) + (b.scalar*a.zy) + (b.yx*a.xz) - (a.yx*b.xz),
+				(b.xz*a.scalar) - (b.yx*a.zy) + (b.scalar*a.xz) + (a.yx*b.zy),
+				(b.yx*a.scalar) + (b.xz*a.zy) - (b.zy*a.xz) + (a.yx*b.scalar),
+				(b.scalar*a.scalar) - (b.zy*a.zy) - (b.xz*a.xz) - (a.yx*b.yx));
 }
 
 
