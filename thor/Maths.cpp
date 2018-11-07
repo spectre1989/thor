@@ -104,17 +104,23 @@ Vec_3f quat_mul(Quat q, Vec_3f v)
 {
 	// todo(jbr) simplify
 
-	return vec_3f((2.0f*((q.scalar*((q.xz*v.z) - (q.yx*v.y))) + (q.zy*((q.xz*v.y) + (q.yx*v.z))))) + (v.x*((q.scalar*q.scalar) + (q.zy*q.zy) - (q.xz*q.xz) - (q.yx*q.yx))),
-				  (2.0f*((q.scalar*((q.yx*v.x) - (q.zy*v.z))) + (q.xz*((q.zy*v.x) + (q.yx*v.z))))) + (v.y*((q.scalar*q.scalar) - (q.zy*q.zy) + (q.xz*q.xz) - (q.yx*q.yx))),
-				  (2.0f*(v.x*((q.zy*q.yx) - (q.scalar*q.xz)) + (v.y*((q.scalar*q.zy) + (q.xz*q.yx))))) + (v.z*((q.scalar*q.scalar) - (q.zy*q.zy) - (q.xz*q.xz) + (q.yx*q.yx))));
+	float32 x = (q.scalar * q.scalar * v.x) + (-2.0f * q.scalar * q.yx * v.y) + (2.0f * q.scalar * q.xz * v.z) + (q.zy * q.zy * v.x) + (2.0f * q.zy * q.xz * v.y) + (2.0f * q.zy * q.yx * v.z) + (-1.0f * q.xz * q.xz * v.x) + (-1.0f * q.yx * q.yx * v.x);
+	float32 y = (2.0f * q.scalar * q.yx * v.x) + (q.scalar * q.scalar * v.y) + (-2.0f * q.scalar * q.zy * v.z) + (2.0f * q.zy * q.xz * v.x) + (-1.0f * q.zy * q.zy * v.y) + (q.xz * q.xz * v.y) + (2.0f * q.xz * q.yx * v.z) + (-1.0f * q.yx * q.yx * v.y);
+	float32 z = (-2.0f * q.scalar * q.xz * v.x) + (2.0f * q.scalar * q.zy * v.y) + (q.scalar * q.scalar * v.z) + (2.0f * q.zy * q.yx * v.x) + (-1.0f * q.zy * q.zy * v.z) + (2.0f * q.xz * q.yx * v.y) + (-1.0f * q.xz * q.xz * v.z) + (q.yx * q.yx * v.z);
+	
+	return vec_3f(x, y, z);
 }
 
 Quat quat_mul(Quat a, Quat b)
 {
-	return quat((b.zy*a.scalar) + (b.scalar*a.zy) + (b.yx*a.xz) - (a.yx*b.xz),
-				(b.xz*a.scalar) - (b.yx*a.zy) + (b.scalar*a.xz) + (a.yx*b.zy),
-				(b.yx*a.scalar) + (b.xz*a.zy) - (b.zy*a.xz) + (a.yx*b.scalar),
-				(b.scalar*a.scalar) - (b.zy*a.zy) - (b.xz*a.xz) - (a.yx*b.yx));
+	// todo(jbr) simplify
+
+	float32 scalar = (a.scalar * b.scalar) + (-1.0f * a.zy * b.zy) + (-1.0f * a.xz * b.xz) + (-1.0f * b.yx * a.yx);
+	float32 zy = (a.zy * b.scalar) + (a.scalar * b.zy) + (a.yx * b.xz) + (-1.0f * b.yx * a.xz);
+	float32 xz = (a.xz * b.scalar) + (-1.0f * a.yx * b.zy) + (a.scalar * b.xz) + (b.yx * a.zy);
+	float32 yx = (a.yx * b.scalar) + (a.xz * b.zy) + (-1.0f * a.zy * b.xz) + (b.yx * a.scalar);
+
+	return quat(zy, xz, yx, scalar);
 }
 
 
