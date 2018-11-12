@@ -130,39 +130,16 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		{
 			camera_pitch -= c_target_frame_dt;
 		}
-		if (g_input_state.keys['P'])
-		{
-			if (!p)
-			{
-				p = 1;
-				use_quat = !use_quat;
-			}
-		}
-		else
-		{
-			p = 0;
-		}
+		
 		constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
 		constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
 		camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
 
-		Matrix_4x4 camera_pitch_matrix;
-		matrix_4x4_rotation_x(&camera_pitch_matrix, camera_pitch);
-		Matrix_4x4 camera_yaw_matrix;
-		matrix_4x4_rotation_z(&camera_yaw_matrix, camera_yaw);
-		Matrix_4x4 camera_matrix;
-		matrix_4x4_mul(&camera_matrix, &camera_yaw_matrix, &camera_pitch_matrix);
-
-		Vec_3f camera_right = matrix_4x4_mul_direction(&camera_matrix, vec_3f(1.0f, 0.0f, 0.0f));
-		Vec_3f camera_forward = matrix_4x4_mul_direction(&camera_matrix, vec_3f(0.0f, 1.0f, 0.0f));
-
-		Quat camera_rotation = quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch);
-		camera_rotation = quat_mul(camera_rotation, quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw));
-		if (use_quat)
-		{
-			camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
-			camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
-		}
+		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
+		
+		Vec_3f camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
+		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 0.0f, 1.0f));
+		Vec_3f camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
 		
 		constexpr float32 c_camera_speed = 5.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
@@ -199,7 +176,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		camera_position = vec_3f_add(camera_position, vec_3f_mul(camera_velocity, c_target_frame_dt));
 
-		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, vec_3f(0.0f, 0.0f, 1.0f));
+		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, camera_up, camera_right);
 
 		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
 
