@@ -14,6 +14,8 @@
 struct Input_State
 {
 	bool32 keys[256];
+	int32 mouse_x;
+	int32 mouse_y;
 };
 
 static Input_State g_input_state;
@@ -29,6 +31,27 @@ static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_p
 
 	case WM_KEYUP:
 		g_input_state.keys[(int32)w_param] = 0;
+		break;
+
+	case WM_LBUTTONDOWN:
+		g_input_state.keys[VK_LBUTTON] = 1;
+		break;
+
+	case WM_LBUTTONUP:
+		g_input_state.keys[VK_LBUTTON] = 0;
+		break;
+
+	case WM_RBUTTONDOWN:
+		g_input_state.keys[VK_RBUTTON] = 1;
+		break;
+
+	case WM_RBUTTONUP:
+		g_input_state.keys[VK_RBUTTON] = 0;
+		break;
+
+	case WM_MOUSEMOVE:
+		g_input_state.mouse_x = l_param & 0xffff;
+		g_input_state.mouse_y = (l_param >> 16) & 0xffff; 
 		break;
 
 	default:
@@ -93,11 +116,13 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
 	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
 
+	int32 mouse_x = g_input_state.mouse_x;
+	int32 mouse_y = g_input_state.mouse_y;
+
 	Vec_3f camera_position = vec_3f(0.0f, 0.0f, 0.0f);
+	Vec_3f camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
 	float32 camera_pitch = 0.0f;
 	float32 camera_yaw = 0.0f;
-	Matrix_4x4 view_matrix;
-	Vec_3f camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
 
 	while (true)
 	{
@@ -111,29 +136,23 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			DispatchMessageA(&msg);
 		}
 
-		static int p = 0;
-		static bool use_quat = false;
+		if (g_input_state.keys[VK_RBUTTON])
+		{
+			constexpr float mouse_sensitivity = 0.01f;
 
-		if (g_input_state.keys['K'])
-		{
-			camera_yaw += c_target_frame_dt;
+			int32 mouse_x_delta = g_input_state.mouse_x - mouse_x;
+			int32 mouse_y_delta = g_input_state.mouse_y - mouse_y; // todo(jbr) debug these, don't seem right
+
+			camera_yaw -= mouse_x_delta * mouse_sensitivity;
+			camera_pitch -= mouse_y_delta * mouse_sensitivity;
+
+			constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
+			constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
+			camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
 		}
-		if (g_input_state.keys['L'])
-		{
-			camera_yaw -= c_target_frame_dt;
-		}
-		if (g_input_state.keys['I'])
-		{
-			camera_pitch += c_target_frame_dt;
-		}
-		if (g_input_state.keys['O'])
-		{
-			camera_pitch -= c_target_frame_dt;
-		}
-		
-		constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
-		constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
-		camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
+
+		mouse_x = g_input_state.mouse_x;
+		mouse_y = g_input_state.mouse_y;
 
 		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
 		
@@ -176,6 +195,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		camera_position = vec_3f_add(camera_position, vec_3f_mul(camera_velocity, c_target_frame_dt));
 
+		Matrix_4x4 view_matrix;
 		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, camera_up, camera_right);
 
 		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
