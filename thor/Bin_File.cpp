@@ -32,7 +32,7 @@ void bin_file_check(File_Handle file)
 
 	// These files are a list of text files used to create this bin (not useful)
 	/*
-	commenting this out to suppress warnings, document bin files and then get rid of this checking stuff
+	commenting this out to suppress warnings, todo(jbr) document bin files and then get rid of this checking stuff
 
 	uint32 files_section_size = file_read_u32(file);
 	uint32 file_count = file_read_u32(file);
