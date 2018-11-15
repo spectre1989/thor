@@ -110,6 +110,38 @@ static void create_buffer(VkDevice device,
 	*out_buffer_memory = buffer_memory;
 }
 
+static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, int32 vertex_offset, uint16* indicies, int32 index_offset)
+{
+	Vec_3f half_size = vec_3f_mul(vec_3f_add(right, up), 0.5f);
+
+	Vec_3f bottom_left = vec_3f_add(pos, vec_3f_mul(half_size, -1.0f));
+	Vec_3f top_left = vec_3f_add(bottom_left, up);
+	Vec_3f top_right = vec_3f_add(top_left, right);
+	Vec_3f bottom_right = vec_3f_add(bottom_left, right);
+
+	int32 vertex_i = vertex_offset * 3;
+
+	vertices[vertex_i++] = bottom_left.x;
+	vertices[vertex_i++] = bottom_left.y;
+	vertices[vertex_i++] = bottom_left.z;
+	vertices[vertex_i++] = top_left.x;
+	vertices[vertex_i++] = top_left.y;
+	vertices[vertex_i++] = top_left.z;
+	vertices[vertex_i++] = top_right.x;
+	vertices[vertex_i++] = top_right.y;
+	vertices[vertex_i++] = top_right.z;
+	vertices[vertex_i++] = bottom_right.x;
+	vertices[vertex_i++] = bottom_right.y;
+	vertices[vertex_i++] = bottom_right.z;
+
+	indicies[index_offset++] = uint16(vertex_offset);
+	indicies[index_offset++] = uint16(vertex_offset + 2);
+	indicies[index_offset++] = uint16(vertex_offset + 1);
+	indicies[index_offset++] = uint16(vertex_offset);
+	indicies[index_offset++] = uint16(vertex_offset + 3);
+	indicies[index_offset++] = uint16(vertex_offset + 2);
+}
+
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
@@ -619,16 +651,66 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 		vkCreateFramebuffer(graphics_state->device, &framebuffer_info, /*allocator*/ nullptr, &framebuffers[i]);
 	}
 
-	constexpr int32 c_vertex_count = 4;
+	constexpr int32 c_num_faces = 6;
+	constexpr int32 c_vertex_count = 4 * c_num_faces;
 	constexpr int32 c_float32_count_per_vertex = 3;
 	constexpr int32 c_vertex_float32_count = c_vertex_count * c_float32_count_per_vertex;
 	constexpr int32 c_vbo_size = c_vertex_float32_count * sizeof(float32);
-	float32 vertices[c_vertex_float32_count] = {
-		-0.5f, 0.0f, 0.5f,	// top left
-		0.5f, 0.0f, 0.5f,	// top right
-		0.5f, 0.0f, -0.5f,	// bottom right
-		-0.5f, 0.0f, -0.5f	// bottom left
-	};
+	constexpr int32 c_index_count = 6 * c_num_faces;
+	constexpr int32 c_ibo_size = c_index_count * sizeof(uint16);
+	
+	float32 vertices[c_vertex_float32_count];
+	uint16 indicies[c_index_count];
+
+	int32 vertex_offset = 0;
+	int32 index_offset = 0;
+	// front face
+	create_quad(vec_3f(0.0f, -0.5f, 0.0f), // pos
+				vec_3f(1.0f, 0.0f, 0.0f),  // right
+				vec_3f(0.0f, 0.0f, 1.0f),  // up
+				vertices, vertex_offset, indicies, index_offset);
+	vertex_offset += 4;
+	index_offset += 6;
+
+	// back face
+	create_quad(vec_3f(0.0f, 0.5f, 0.0f), // pos
+				vec_3f(-1.0f, 0.0f, 0.0f),  // right
+				vec_3f(0.0f, 0.0f, 1.0f),  // up
+				vertices, vertex_offset, indicies, index_offset);
+	vertex_offset += 4;
+	index_offset += 6;
+
+	// left face
+	create_quad(vec_3f(-0.5f, 0.0f, 0.0f), // pos
+				vec_3f(0.0f, -1.0f, 0.0f),  // right
+				vec_3f(0.0f, 0.0f, 1.0f),  // up
+				vertices, vertex_offset, indicies, index_offset);
+	vertex_offset += 4;
+	index_offset += 6;
+
+	// left face
+	create_quad(vec_3f(0.5f, 0.0f, 0.0f), // pos
+				vec_3f(0.0f, 1.0f, 0.0f),  // right
+				vec_3f(0.0f, 0.0f, 1.0f),  // up
+				vertices, vertex_offset, indicies, index_offset);
+	vertex_offset += 4;
+	index_offset += 6;
+
+	// top face
+	create_quad(vec_3f(0.0f, 0.0f, 0.5f), // pos
+				vec_3f(1.0f, 0.0f, 0.0f),  // right
+				vec_3f(0.0f, 1.0f, 0.0f),  // up
+				vertices, vertex_offset, indicies, index_offset);
+	vertex_offset += 4;
+	index_offset += 6;
+
+	// bottom face
+	create_quad(vec_3f(0.0f, 0.0f, -0.5f), // pos
+				vec_3f(1.0f, 0.0f, 0.0f),  // right
+				vec_3f(0.0f, -1.0f, 0.0f),  // up
+				vertices, vertex_offset, indicies, index_offset);
+	vertex_offset += 4;
+	index_offset += 6;
 
 	VkBuffer vertex_buffer;
 	VkDeviceMemory vertex_buffer_memory;
@@ -645,13 +727,6 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	assert(result == VK_SUCCESS);
 	memcpy(vbo_data, vertices, c_vbo_size);
 	vkUnmapMemory(graphics_state->device, vertex_buffer_memory);
-
-	constexpr int32 c_index_count = 6;
-	constexpr int32 c_ibo_size = c_index_count * sizeof(uint16);
-	uint16 indicies[c_index_count] = {
-		0, 1, 2,
-		0, 2, 3
-	};
 
 	VkBuffer index_buffer;
 	VkDeviceMemory index_buffer_memory;
@@ -744,7 +819,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	rasterisation_state_info.depthClampEnable = false; // todo(jbr) is depth clamping good?
 	rasterisation_state_info.rasterizerDiscardEnable = false;
 	rasterisation_state_info.polygonMode = VK_POLYGON_MODE_LINE;
-	rasterisation_state_info.cullMode = VK_CULL_MODE_NONE; // VK_CULL_MODE_BACK_BIT; disabling this while drawing in wireframe
+	rasterisation_state_info.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterisation_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterisation_state_info.depthBiasEnable = false;
 	rasterisation_state_info.depthBiasConstantFactor = 0.0f;

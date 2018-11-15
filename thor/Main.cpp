@@ -116,8 +116,9 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
 	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
 
-	int32 mouse_x = g_input_state.mouse_x;
-	int32 mouse_y = g_input_state.mouse_y;
+	bool32 was_mouse_down = 0;
+	int32 mouse_x_on_mouse_down = 0;
+	int32 mouse_y_on_mouse_down = 0;
 
 	Vec_3f camera_position = vec_3f(0.0f, 0.0f, 0.0f);
 	Vec_3f camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
@@ -138,22 +139,38 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		if (g_input_state.keys[VK_RBUTTON])
 		{
-			constexpr float mouse_sensitivity = 0.01f;
+			if (!was_mouse_down)
+			{
+				mouse_x_on_mouse_down = g_input_state.mouse_x;
+				mouse_y_on_mouse_down = g_input_state.mouse_y;
+			}
 
-			int32 mouse_x_delta = g_input_state.mouse_x - mouse_x;
-			int32 mouse_y_delta = g_input_state.mouse_y - mouse_y; // todo(jbr) debug these, don't seem right
+			// lock mouse while right mouse button is down
+			POINT mouse_pos;
+			mouse_pos.x = mouse_x_on_mouse_down;
+			mouse_pos.y = mouse_y_on_mouse_down;
+			ClientToScreen(window_handle, &mouse_pos);
+			SetCursorPos(mouse_pos.x, mouse_pos.y);
+
+			was_mouse_down = 1;
+
+			constexpr float mouse_sensitivity = 0.005f;
+
+			int32 mouse_x_delta = g_input_state.mouse_x - mouse_x_on_mouse_down;
+			int32 mouse_y_delta = g_input_state.mouse_y - mouse_y_on_mouse_down;
 
 			camera_yaw -= mouse_x_delta * mouse_sensitivity;
 			camera_pitch -= mouse_y_delta * mouse_sensitivity;
 
-			constexpr float32 min_pitch = c_deg_to_rad * -40.0f;
-			constexpr float32 max_pitch = c_deg_to_rad * 40.0f;
+			constexpr float32 min_pitch = c_deg_to_rad * -48.0f;
+			constexpr float32 max_pitch = c_deg_to_rad * 48.0f;
 			camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
 		}
-
-		mouse_x = g_input_state.mouse_x;
-		mouse_y = g_input_state.mouse_y;
-
+		else
+		{
+			was_mouse_down = 0;
+		}
+		
 		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
 		
 		Vec_3f camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
