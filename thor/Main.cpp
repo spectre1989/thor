@@ -62,7 +62,7 @@ static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_p
 }
 
 // todo(jbr) would it be better to use wall and disable selectively?
-int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle*/, LPSTR /*cmd_line*/, int /*cmd_show*/)
+int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle*/, LPSTR cmd_line, int /*cmd_show*/)
 {
 	const char* window_class_name = "Thor_Window_Class";
 
@@ -116,6 +116,13 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
 	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
 
+	if (string_length(cmd_line))
+	{
+		File_Handle geobin_file = file_open_read(cmd_line);
+		geobin_file_read(geobin_file);
+		file_close(geobin_file);
+	}
+
 	bool32 was_mouse_down = 0;
 	int32 mouse_x_on_mouse_down = 0;
 	int32 mouse_y_on_mouse_down = 0;
@@ -145,14 +152,14 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 				mouse_y_on_mouse_down = g_input_state.mouse_y;
 			}
 
+			was_mouse_down = 1;
+
 			// lock mouse while right mouse button is down
 			POINT mouse_pos;
 			mouse_pos.x = mouse_x_on_mouse_down;
 			mouse_pos.y = mouse_y_on_mouse_down;
 			ClientToScreen(window_handle, &mouse_pos);
 			SetCursorPos(mouse_pos.x, mouse_pos.y);
-
-			was_mouse_down = 1;
 
 			constexpr float mouse_sensitivity = 0.005f;
 

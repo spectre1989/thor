@@ -7,11 +7,11 @@
 
 
 
-void bin_file_check_geobin(File_Handle file);
-void bin_file_check_bounds(File_Handle file);
-void bin_file_check_origins(File_Handle file);
-void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst);
-uint32 bin_file_read_color(File_Handle file);
+static void bin_file_check_geobin(File_Handle file);
+static void bin_file_check_bounds(File_Handle file);
+static void bin_file_check_origins(File_Handle file);
+static void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst);
+static uint32 bin_file_read_color(File_Handle file);
 
 void bin_file_check(File_Handle file)
 {
@@ -342,7 +342,7 @@ void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
 	}
 }
 
-uint32 bin_file_read_color(File_Handle file)
+/*uint32 bin_file_read_color(File_Handle file)
 {
 	// for some reason the 3 components are written as 3 individual uint32s
 	uint32 r = file_read_u32(file);
@@ -351,4 +351,4 @@ uint32 bin_file_read_color(File_Handle file)
 	assert((r < 256) && (g < 256) && (b < 256));
 
 	return (r << 16) | (g << 8) | b;
-}
+}*/
