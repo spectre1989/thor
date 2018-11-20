@@ -393,6 +393,7 @@ void geobin_file_read(File_Handle file)
 	uint32 def_count = file_read_u32(file);
 	for (uint32 def_i = 0; def_i < def_count; ++def_i)
 	{
+		file_skip(file, 4); // size
 		bin_file_skip_string(file); // name
 
 		uint32 group_count = file_read_u32(file);
@@ -496,7 +497,7 @@ void geobin_file_read(File_Handle file)
 			file_skip(file, size);
 		}
 
-		bin_file_read_string(file, sizeof(buffer), buffer); // "SoundScript"
+		bin_file_skip_string(file); // "SoundScript"
 	}
 
 	/*
