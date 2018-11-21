@@ -142,7 +142,7 @@ static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, in
 	indicies[index_offset++] = uint16(vertex_offset + 2);
 }
 
-void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
+void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, int32 num_objects_in_scene, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
 
@@ -482,13 +482,13 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &depth_buffer_image_view);
 	assert(result == VK_SUCCESS);
 
-	constexpr uint32 c_matrix_count = 256;
-	constexpr uint32 c_ubo_size = c_matrix_count * 4 * 4 * sizeof(float32);
+	const uint32 matrix_count = num_objects_in_scene > 0 ? num_objects_in_scene : 1;
+	const uint32 ubo_size = matrix_count * 4 * 4 * sizeof(float32);
 
 	VkBuffer uniform_buffer;
 	create_buffer(graphics_state->device, 
 		&gpu_memory_properties, 
-		c_ubo_size, 
+		ubo_size, 
 		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
 		&uniform_buffer, 
@@ -555,7 +555,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkDescriptorBufferInfo buffer_info = {};
 	buffer_info.buffer = uniform_buffer;
 	buffer_info.offset = 0;
-	buffer_info.range = c_ubo_size;
+	buffer_info.range = ubo_size;
 
 	VkWriteDescriptorSet descriptor_set_write = {};
 	descriptor_set_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -993,16 +993,17 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	vkCreateSemaphore(graphics_state->device, &semaphore_info, /*allocator*/ nullptr, &graphics_state->semaphore);
 }
 
-void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Vec_3f cube_position)
+void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Matrix_4x4* object_matrices, int32 num_objects)
 {
-	Matrix_4x4 model_matrix;
-	matrix_4x4_translation(&model_matrix, cube_position);
-
-	Matrix_4x4 model_view_matrix;
-	matrix_4x4_mul(&model_view_matrix, view_matrix, &model_matrix);
+	Matrix_4x4 view_projection_matrix;
+	matrix_4x4_mul(&view_projection_matrix, &graphics_state->projection_matrix, view_matrix);
 
 	Matrix_4x4 mvp_matrix;
-	matrix_4x4_mul(&mvp_matrix, &graphics_state->projection_matrix, &model_view_matrix);
+
+	for (int32 i = 0; i < num_objects; ++i)
+	{
+		matrix_4x4_mul(&mvp_matrix, &view_projection_matrix, &object_matrices[i]);
+	}
 
 	float* ubo_data;
 	VkResult result = vkMapMemory(graphics_state->device, graphics_state->uniform_buffer_memory, /*offset*/ 0, sizeof(float32) * 16, /*flags*/ 0, (void**)&ubo_data);

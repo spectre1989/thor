@@ -366,7 +366,7 @@ static void bin_file_skip_string(File_Handle file)
 	return (r << 16) | (g << 8) | b;
 }*/
 
-void geobin_file_read(File_Handle file)
+void geobin_file_read(File_Handle file, Matrix_4x4* object_matrices, int32 num_object_matrices, int32* out_num_objects_in_scene)
 {
 	uint8 sig[8];
 	file_read(file, 8, sig);
@@ -390,6 +390,8 @@ void geobin_file_read(File_Handle file)
 	bin_file_skip_string(file); // scene file
 	bin_file_skip_string(file); // loading screen
 
+	int32 matrix_index = 0;
+
 	uint32 def_count = file_read_u32(file);
 	for (uint32 def_i = 0; def_i < def_count; ++def_i)
 	{
@@ -404,6 +406,13 @@ void geobin_file_read(File_Handle file)
 			
 			Vec_3f pos = file_read_vec_3f(file);
 			Vec_3f rot = file_read_vec_3f(file);
+
+			if (matrix_index < num_object_matrices)
+			{
+				matrix_4x4_translation(&object_matrices[matrix_index], pos);
+
+				++matrix_index;
+			}
 
 			file_skip(file, 4); // flags
 		}
@@ -713,4 +722,6 @@ void geobin_file_read(File_Handle file)
 		bin_file_read_string(file, sizeof(buffer), buffer);
 	}
 	*/
+
+	*out_num_objects_in_scene = matrix_index;
 }

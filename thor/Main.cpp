@@ -113,15 +113,19 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Linear_Allocator temp_allocator;
 	linear_allocator_create(&temp_allocator, megabytes(1));
 
-	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
-	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, &allocator, &temp_allocator);
+	constexpr int32 c_max_objects_in_scene = 8000;
+	Matrix_4x4* matrices = (Matrix_4x4*)linear_allocator_alloc(&allocator, sizeof(Matrix_4x4) * c_max_objects_in_scene);
+	int32 num_objects_in_scene = 0;
 
 	if (string_length(cmd_line))
 	{
 		File_Handle geobin_file = file_open_read(cmd_line);
-		geobin_file_read(geobin_file);
+		geobin_file_read(geobin_file, matrices, c_max_objects_in_scene, &num_objects_in_scene);
 		file_close(geobin_file);
 	}
+
+	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
+	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, num_objects_in_scene, &allocator, &temp_allocator);
 
 	bool32 was_mouse_down = 0;
 	int32 mouse_x_on_mouse_down = 0;
@@ -222,7 +226,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		Matrix_4x4 view_matrix;
 		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, camera_up, camera_right);
 
-		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
+		graphics_draw(graphics_state, &view_matrix, matrices, num_objects_in_scene);
 
 		// wait for end of frame
 		LARGE_INTEGER now;
