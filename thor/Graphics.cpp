@@ -998,17 +998,16 @@ void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Matr
 	Matrix_4x4 view_projection_matrix;
 	matrix_4x4_mul(&view_projection_matrix, &graphics_state->projection_matrix, view_matrix);
 
-	Matrix_4x4 mvp_matrix;
+	float* ubo_data;
+	VkResult result = vkMapMemory(graphics_state->device, graphics_state->uniform_buffer_memory, /*offset*/ 0, sizeof(float32) * 16 * num_objects, /*flags*/ 0, (void**)&ubo_data);
+	assert(result == VK_SUCCESS);
 
 	for (int32 i = 0; i < num_objects; ++i)
 	{
-		matrix_4x4_mul(&mvp_matrix, &view_projection_matrix, &object_matrices[i]);
+		Matrix_4x4* mvp_matrix = (Matrix_4x4*)&ubo_data[sizeof(float32) * 16 * i];
+		matrix_4x4_mul(mvp_matrix, &view_projection_matrix, &object_matrices[i]);
 	}
 
-	float* ubo_data;
-	VkResult result = vkMapMemory(graphics_state->device, graphics_state->uniform_buffer_memory, /*offset*/ 0, sizeof(float32) * 16, /*flags*/ 0, (void**)&ubo_data);
-	assert(result == VK_SUCCESS);
-	memcpy(ubo_data, &mvp_matrix, sizeof(float32) * 16);
 	vkUnmapMemory(graphics_state->device, graphics_state->uniform_buffer_memory);
 
 	uint32 image_index;

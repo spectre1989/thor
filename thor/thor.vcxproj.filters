@@ -139,7 +139,11 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="shaders\shader.frag" />
-    <CustomBuild Include="shaders\shader.vert" />
+    <CustomBuild Include="shaders\shader.frag">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="shaders\shader.vert">
+      <Filter>Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

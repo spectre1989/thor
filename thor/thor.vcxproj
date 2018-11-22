@@ -222,13 +222,13 @@ $(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -o ..\data\shaders\%(Filen
     <CustomBuild Include="shaders\shader.vert">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">if not exist ..\data\shaders mkdir ..\data\shaders
-$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -o ..\data\shaders\%(Filename).vert.spv</Command>
+$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -V -o ..\data\shaders\%(Filename).vert.spv</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">if not exist ..\data\shaders mkdir ..\data\shaders
-$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -o ..\data\shaders\%(Filename).vert.spv</Command>
+$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -V -o ..\data\shaders\%(Filename).vert.spv</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">if not exist ..\data\shaders mkdir ..\data\shaders
-$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -o ..\data\shaders\%(Filename).vert.spv</Command>
+$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -V -o ..\data\shaders\%(Filename).vert.spv</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">if not exist ..\data\shaders mkdir ..\data\shaders
-$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -o ..\data\shaders\%(Filename).vert.spv</Command>
+$(VULKAN_SDK)\bin\glslangValidator.exe %(Identity) -G -V -o ..\data\shaders\%(Filename).vert.spv</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\data\shaders\%(Filename).vert.spv;%(Outputs)</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\data\shaders\%(Filename).vert.spv;%(Outputs)</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\data\shaders\%(Filename).vert.spv;%(Outputs)</Outputs>
