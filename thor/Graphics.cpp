@@ -970,7 +970,18 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		vkCmdBindIndexBuffer(command_buffer, index_buffer, /*offset*/ 0, VK_INDEX_TYPE_UINT16);
 
-		vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
+		for (int32 object_i = 0; object_i < num_objects_in_scene; ++object_i)
+		{
+			vkCmdPushConstants(
+				command_buffer,
+				pipeline_layout,
+				VK_SHADER_STAGE_VERTEX_BIT,
+				/*offset*/ 0,
+				sizeof(int32),
+				&object_i);
+
+			vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
+		}
 
 		vkCmdEndRenderPass(command_buffer);
 

@@ -8,7 +8,7 @@ layout(binding = 0, set = 0) uniform Transform_Ubo
 
 layout(push_constant) uniform Push_Constants
 {
-  uint matrix_i;
+  int matrix_i;
 } push_constants;
 
 layout(location = 0) in vec3 position;

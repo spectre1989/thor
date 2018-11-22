@@ -113,7 +113,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Linear_Allocator temp_allocator;
 	linear_allocator_create(&temp_allocator, megabytes(1));
 
-	constexpr int32 c_max_objects_in_scene = 8000;
+	constexpr int32 c_max_objects_in_scene = 8 * 1024;
 	Matrix_4x4* matrices = (Matrix_4x4*)linear_allocator_alloc(&allocator, sizeof(Matrix_4x4) * c_max_objects_in_scene);
 	int32 num_objects_in_scene = 0;
 
