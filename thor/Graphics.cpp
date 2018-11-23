@@ -512,14 +512,19 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateDescriptorSetLayout(graphics_state->device, &descriptor_set_layout_info, /*allocator*/ nullptr, &descriptor_set_layout);
 	assert(result == VK_SUCCESS);
 
+	VkPushConstantRange push_constant_range = {};
+	push_constant_range.offset = 0;
+	push_constant_range.size = sizeof(int32);
+	push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
 	VkPipelineLayoutCreateInfo pipeline_layout_info = {};
 	pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 	pipeline_layout_info.pNext = nullptr;
 	pipeline_layout_info.flags = 0;
 	pipeline_layout_info.setLayoutCount = 1;
 	pipeline_layout_info.pSetLayouts = &descriptor_set_layout;
-	pipeline_layout_info.pushConstantRangeCount = 0;
-	pipeline_layout_info.pPushConstantRanges = nullptr;
+	pipeline_layout_info.pushConstantRangeCount = 1;
+	pipeline_layout_info.pPushConstantRanges = &push_constant_range;
 
 	VkPipelineLayout pipeline_layout;
 	result = vkCreatePipelineLayout(graphics_state->device, &pipeline_layout_info, /*allocator*/ nullptr, &pipeline_layout);

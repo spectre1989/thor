@@ -415,7 +415,7 @@ void geobin_file_read(File_Handle file, Matrix_4x4* object_matrices, int32 num_o
 			}
 			else
 			{
-				assert(false);
+				//assert(false);
 			}
 
 			file_skip(file, 4); // flags
