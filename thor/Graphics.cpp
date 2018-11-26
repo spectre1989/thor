@@ -1020,7 +1020,7 @@ void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Matr
 
 	for (int32 i = 0; i < num_objects; ++i)
 	{
-		Matrix_4x4* mvp_matrix = (Matrix_4x4*)&ubo_data[sizeof(float32) * 16 * i];
+		Matrix_4x4* mvp_matrix = (Matrix_4x4*)&ubo_data[16 * i];
 		matrix_4x4_mul(mvp_matrix, &view_projection_matrix, &object_matrices[i]);
 	}
 
