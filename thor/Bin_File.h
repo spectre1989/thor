@@ -16,4 +16,4 @@ constexpr uint32 c_bin_origins_type_id = 0x6d177c17;
  */
 void bin_file_check(File_Handle file);
 
-void geobin_file_read(File_Handle file, Matrix_4x4* object_matrices, int32 num_object_matrices, int32* out_num_objects_in_scene);
+void geobin_file_read(File_Handle file, Matrix_4x4* object_matrices, int32 num_object_matrices, int32* out_num_objects_in_scene, struct Linear_Allocator* temp_allocator);

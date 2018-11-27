@@ -11,7 +11,7 @@ static void bin_file_check_geobin(File_Handle file);
 static void bin_file_check_bounds(File_Handle file);
 static void bin_file_check_origins(File_Handle file);
 static void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst);
-static uint32 bin_file_read_color(File_Handle file);
+//static uint32 bin_file_read_color(File_Handle file);
 
 void bin_file_check(File_Handle file)
 {
@@ -342,6 +342,25 @@ void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
 	}
 }
 
+void bin_file_read_string(File_Handle file, Linear_Allocator* allocator, const char** out_string)
+{
+	uint16 string_length = file_read_u16(file);
+	
+	char* str = (char*)linear_allocator_alloc(allocator, string_length + 1);
+
+	file_read(file, string_length, str);
+	str[string_length] = 0;
+
+	// note: bin files need 4 byte aligned reads
+	uint32 bytes_misaligned = (string_length + 2) & 3; // & 3 is equivalent to % 4
+	if (bytes_misaligned)
+	{
+		file_skip(file, 4 - bytes_misaligned);
+	}
+
+	*out_string = str;
+}
+
 static void bin_file_skip_string(File_Handle file)
 {
 	uint16 string_length = file_read_u16(file);
@@ -366,7 +385,7 @@ static void bin_file_skip_string(File_Handle file)
 	return (r << 16) | (g << 8) | b;
 }*/
 
-void geobin_file_read(File_Handle file, Matrix_4x4* object_matrices, int32 num_object_matrices, int32* out_num_objects_in_scene)
+void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /*num_object_matrices*/, int32* out_num_objects_in_scene, Linear_Allocator* temp_allocator)
 {
 	uint8 sig[8];
 	file_read(file, 8, sig);
@@ -392,31 +411,45 @@ void geobin_file_read(File_Handle file, Matrix_4x4* object_matrices, int32 num_o
 
 	int32 matrix_index = 0;
 
+	struct Group
+	{
+		const char* name;
+		Vec_3f position;
+		Vec_3f rotation;
+	};
+
+	struct Def
+	{
+		const char* name;
+		Group* groups;
+	};
+
 	uint32 def_count = file_read_u32(file);
+
+	Def* defs = (Def*)linear_allocator_alloc(temp_allocator, sizeof(Def) * def_count);
+
 	for (uint32 def_i = 0; def_i < def_count; ++def_i)
 	{
-		file_skip(file, 4); // size
-		bin_file_skip_string(file); // name
+		Def* def = &defs[def_i];
 
+		file_skip(file, 4); // size
+
+		bin_file_read_string(file, temp_allocator, &def->name);
+		
 		uint32 group_count = file_read_u32(file);
+
+		def->groups = (Group*)linear_allocator_alloc(temp_allocator, sizeof(Group) * group_count);
+
 		for (uint32 group_i = 0; group_i < group_count; ++group_i)
 		{
+			Group* group = &def->groups[group_i];
+
 			file_skip(file, 4); // size
-			bin_file_skip_string(file); // name
+
+			bin_file_read_string(file, temp_allocator, &group->name);
 			
-			Vec_3f pos = file_read_vec_3f(file);
-			Vec_3f rot = file_read_vec_3f(file);
-
-			if (matrix_index < num_object_matrices)
-			{
-				matrix_4x4_translation(&object_matrices[matrix_index], pos);
-
-				++matrix_index;
-			}
-			else
-			{
-				//assert(false);
-			}
+			group->position = file_read_vec_3f(file);
+			group->rotation = file_read_vec_3f(file);
 
 			file_skip(file, 4); // flags
 		}

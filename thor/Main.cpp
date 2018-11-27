@@ -111,7 +111,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	linear_allocator_create(&allocator, megabytes(1));
 
 	Linear_Allocator temp_allocator;
-	linear_allocator_create(&temp_allocator, megabytes(1));
+	linear_allocator_create(&temp_allocator, megabytes(16));
 
 	constexpr int32 c_max_objects_in_scene = 1024;
 	Matrix_4x4* matrices = (Matrix_4x4*)linear_allocator_alloc(&allocator, sizeof(Matrix_4x4) * c_max_objects_in_scene);
@@ -120,7 +120,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	if (string_length(cmd_line))
 	{
 		File_Handle geobin_file = file_open_read(cmd_line);
-		geobin_file_read(geobin_file, matrices, c_max_objects_in_scene, &num_objects_in_scene);
+		geobin_file_read(geobin_file, matrices, c_max_objects_in_scene, &num_objects_in_scene, &temp_allocator);
 		file_close(geobin_file);
 	}
 
