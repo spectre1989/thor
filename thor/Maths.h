@@ -48,6 +48,7 @@ Vec_3f vec_3f_lerp(Vec_3f a, Vec_3f b, float32 t);
 Quat quat(float32 zy, float32 xz, float32 yx, float32 scalar);
 Quat quat_identity();
 Quat quat_angle_axis(Vec_3f axis, float32 angle);
+Quat quat_euler(Vec_3f euler);
 Vec_3f quat_mul(Quat q, Vec_3f v);
 Quat quat_mul(Quat a, Quat b);
 

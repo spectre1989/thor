@@ -100,6 +100,16 @@ Quat quat_angle_axis(Vec_3f axis, float32 angle)
 	return quat(axis.x * sin_half_theta, axis.y * sin_half_theta, axis.z * sin_half_theta, cosf(half_theta));
 }
 
+Quat quat_euler(Vec_3f euler)
+{
+	Quat pitch = quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), euler.x);
+	Quat yaw = quat_angle_axis(vec_3f(0.0f, 1.0f, 0.0f), euler.y);
+	Quat roll = quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), euler.z);
+	
+	// do roll, then pitch, then yaw
+	return quat_mul(yaw, quat_mul(pitch, roll));
+}
+
 Vec_3f quat_mul(Quat q, Vec_3f v)
 {
 	// todo(jbr) simplify

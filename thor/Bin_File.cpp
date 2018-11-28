@@ -385,7 +385,69 @@ static void bin_file_skip_string(File_Handle file)
 	return (r << 16) | (g << 8) | b;
 }*/
 
-void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /*num_object_matrices*/, int32* out_num_objects_in_scene, Linear_Allocator* temp_allocator)
+struct Group
+{
+	const char* name;
+	Vec_3f position;
+	Quat rotation;
+};
+
+struct Def
+{
+	const char* name;
+	Group* groups;
+	int32 group_count;
+};
+
+static void recursively_read_def(const char* object_library_path, Def* defs, int32 def_count, const char* def_name, Vec_3f parent_position, Quat parent_rotation)
+{
+	Def* def = defs;
+	Def* def_end = &defs[def_count];
+	for (; def != def_end; ++def)
+	{
+		if (string_equals(def->name, def_name))
+		{
+			break;
+		}
+	}
+	assert(def != def_end);
+	
+	Group* group_end = &def->groups[def->group_count];
+	for (Group* group = def->groups; group != group_end; ++group)
+	{
+		Vec_3f world_position = vec_3f_add(quat_mul(parent_rotation, group->position), parent_position);
+		Quat world_rotation = quat_mul(parent_rotation, group->rotation); // todo(jbr) is that right?
+
+		if (string_starts_with(group->name, "grp"))
+		{
+			recursively_read_def(object_library_path, defs, def_count, group->name, world_position, world_rotation);
+		}
+		else
+		{
+			char geo_file_path[256];
+			string_concat(object_library_path, group->name, geo_file_path);
+
+			int32 last_slash = string_find_last(geo_file_path, '/');
+			char model_name[64];
+			string_copy(&geo_file_path[last_slash + 1], model_name);
+
+			int32 second_to_last_slash = string_find_last(geo_file_path, '/', last_slash - 1);
+			char geo_name[64];
+			int32 geo_name_length = string_copy(&geo_file_path[second_to_last_slash + 1], last_slash - second_to_last_slash - 1, geo_name);
+
+			string_copy(geo_name, &geo_file_path[last_slash + 1]);
+			string_copy(".geo", &geo_file_path[last_slash + geo_name_length + 1]);
+
+			File_Handle geo_file = file_open_read(geo_file_path);
+			if (file_is_valid(geo_file))
+			{
+				file_close(geo_file);
+			}
+		}
+	}
+}
+
+void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /*object_matrices*/, int32 /*num_object_matrices*/, int32* out_num_objects_in_scene, Linear_Allocator* temp_allocator)
 {
 	uint8 sig[8];
 	file_read(file, 8, sig);
@@ -406,31 +468,18 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 	file_skip(file, files_section_size);
 
 	file_skip(file, 4); // uint32 data_size
-	file_skip(file, 4); // uint32 version
+	file_skip(file, 4); // int32 version
 
 	bin_file_skip_string(file); // scene file
 	bin_file_skip_string(file); // loading screen
 
 	int32 matrix_index = 0;
 
-	struct Group
-	{
-		const char* name;
-		Vec_3f position;
-		Quat rotation;
-	};
-
-	struct Def
-	{
-		const char* name;
-		Group* groups;
-	};
-
-	uint32 def_count = file_read_u32(file);
+	int32 def_count = file_read_i32(file);
 
 	Def* defs = (Def*)linear_allocator_alloc(temp_allocator, sizeof(Def) * def_count);
 
-	for (uint32 def_i = 0; def_i < def_count; ++def_i)
+	for (int32 def_i = 0; def_i < def_count; ++def_i)
 	{
 		Def* def = &defs[def_i];
 
@@ -438,11 +487,12 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 
 		bin_file_read_string(file, temp_allocator, &def->name);
 		
-		uint32 group_count = file_read_u32(file);
+		int32 group_count = file_read_i32(file);
 
+		def->group_count = group_count;
 		def->groups = (Group*)linear_allocator_alloc(temp_allocator, sizeof(Group) * group_count);
 
-		for (uint32 group_i = 0; group_i < group_count; ++group_i)
+		for (int32 group_i = 0; group_i < group_count; ++group_i)
 		{
 			Group* group = &def->groups[group_i];
 
@@ -451,84 +501,85 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 			bin_file_read_string(file, temp_allocator, &group->name);
 			
 			group->position = file_read_vec_3f(file);
-			Vec_3f euler = file_read_vec_3f(file);
+			Vec_3f euler_degrees = file_read_vec_3f(file);
+			Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);
 			group->rotation = quat_euler(euler);
 
 			file_skip(file, 4); // flags
 		}
 
-		uint32 property_count = file_read_u32(file);
-		for (uint32 property_i = 0; property_i < property_count; ++property_i)
+		int32 property_count = file_read_i32(file);
+		for (int32 property_i = 0; property_i < property_count; ++property_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 tint_color_count = file_read_u32(file);
-		for (uint32 tint_color_i = 0; tint_color_i < tint_color_count; ++tint_color_i)
+		int32 tint_color_count = file_read_i32(file);
+		for (int32 tint_color_i = 0; tint_color_i < tint_color_count; ++tint_color_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 ambient_count = file_read_u32(file);
-		for (uint32 ambient_i = 0; ambient_i < ambient_count; ++ambient_i)
+		int32 ambient_count = file_read_i32(file);
+		for (int32 ambient_i = 0; ambient_i < ambient_count; ++ambient_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 omni_count = file_read_u32(file);
-		for (uint32 omni_i = 0; omni_i < omni_count; ++omni_i)
+		int32 omni_count = file_read_i32(file);
+		for (int32 omni_i = 0; omni_i < omni_count; ++omni_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 cubemap_count = file_read_u32(file);
-		for (uint32 cubemap_i = 0; cubemap_i < cubemap_count; ++cubemap_i)
+		int32 cubemap_count = file_read_i32(file);
+		for (int32 cubemap_i = 0; cubemap_i < cubemap_count; ++cubemap_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 volume_count = file_read_u32(file);
-		for (uint32 volume_i = 0; volume_i < volume_count; ++volume_i)
+		int32 volume_count = file_read_i32(file);
+		for (int32 volume_i = 0; volume_i < volume_count; ++volume_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 sound_count = file_read_u32(file);
-		for (uint32 sound_i = 0; sound_i < sound_count; ++sound_i)
+		int32 sound_count = file_read_i32(file);
+		for (int32 sound_i = 0; sound_i < sound_count; ++sound_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 replace_tex_count = file_read_u32(file);
-		for (uint32 replace_tex_i = 0; replace_tex_i < replace_tex_count; ++replace_tex_i)
+		int32 replace_tex_count = file_read_i32(file);
+		for (int32 replace_tex_i = 0; replace_tex_i < replace_tex_count; ++replace_tex_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 beacon_count = file_read_u32(file);
-		for (uint32 beacon_i = 0; beacon_i < beacon_count; ++beacon_i)
+		int32 beacon_count = file_read_i32(file);
+		for (int32 beacon_i = 0; beacon_i < beacon_count; ++beacon_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 fog_count = file_read_u32(file);
-		for (uint32 fog_i = 0; fog_i < fog_count; ++fog_i)
+		int32 fog_count = file_read_i32(file);
+		for (int32 fog_i = 0; fog_i < fog_count; ++fog_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
 		}
 
-		uint32 lod_count = file_read_u32(file);
-		for (uint32 lod_i = 0; lod_i < lod_count; ++lod_i)
+		int32 lod_count = file_read_i32(file);
+		for (int32 lod_i = 0; lod_i < lod_count; ++lod_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
@@ -539,8 +590,8 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 		file_skip(file, 4); // float32 alpha
 		bin_file_skip_string(file); // "Obj"
 
-		uint32 tex_swap_count = file_read_u32(file);
-		for (uint32 tex_swap_i = 0; tex_swap_i < tex_swap_count; ++tex_swap_i)
+		int32 tex_swap_count = file_read_i32(file);
+		for (int32 tex_swap_i = 0; tex_swap_i < tex_swap_count; ++tex_swap_i)
 		{
 			uint32 size = file_read_u32(file);
 			file_skip(file, size);
@@ -549,41 +600,24 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 		bin_file_skip_string(file); // "SoundScript"
 	}
 
-	uint32 ref_count = file_read_u32(file);
-	for (uint32 ref_i = 0; ref_i < ref_count; ++ref_i)
+	char object_library_path[256];
+	string_concat(coh_data_path, "\\object_library\\", object_library_path);
+
+	int32 ref_count = file_read_i32(file);
+	for (int32 ref_i = 0; ref_i < ref_count; ++ref_i)
 	{
 		file_skip(file, 4);
 
-		char buffer[256];
-		bin_file_read_string(file, sizeof(buffer), buffer);
+		char def_name[256];
+		bin_file_read_string(file, sizeof(def_name), def_name);
 		Vec_3f position = file_read_vec_3f(file);
-		Vec_3f euler = file_read_vec_3f(file);
+		Vec_3f euler_degrees = file_read_vec_3f(file);
+		Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);
 		Quat rotation = quat_euler(euler);
 
 		// todo(jbr) match the coordinate system of CoX
 
-		// something like this
-		recursive_func(buffer, position, euler);
-		
-		void recursive_func(const char* def_name, Vec_3f world_position, Quat world_rotation)
-		{
-			Def* def = find_def(buffer);
-			Group* group_end = def->groups[def->group_count];
-			for (Group* group = def->groups; group != group_end; ++group)
-			{
-				Vec_3f group_world_position = quat_mul(world_rotation, group->position) + world_position;
-				Quat group_world_rotation = quat_mul(world_rotation, group->rotation); // todo(jbr) is that right?
-
-				if (string_starts_with(group->name, "grp"))
-				{
-					recursive_func(group->name, group_world_position group_world_rotation);
-				}
-				else
-				{
-					// find geo
-				}
-			}
-		}
+		recursively_read_def(object_library_path, defs, def_count, def_name, position, rotation);
 	}
 
 	/*

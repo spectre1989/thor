@@ -20,11 +20,23 @@ void file_close(File_Handle file)
 	CloseHandle(file);
 }
 
+bool file_is_valid(File_Handle file)
+{
+	return file != INVALID_HANDLE_VALUE;
+}
+
 void file_read(File_Handle file, uint32 byte_count, void* bytes)
 {
 	DWORD num_bytes_read;
 	bool success = ReadFile(file, bytes, byte_count, &num_bytes_read, /*lpOverlapped*/ nullptr);
 	assert(success);
+}
+
+int32 file_read_i32(File_Handle file)
+{
+	int32 i32;
+	file_read(file, sizeof(i32), &i32);
+	return i32;
 }
 
 uint32 file_read_u32(File_Handle file)

@@ -11,7 +11,9 @@ typedef void (*On_File_Found_Function)(const char* path, void* state);
 File_Handle file_open_read(const char* path);
 File_Handle file_open_write(const char* path);
 void file_close(File_Handle file);
+bool file_is_valid(File_Handle file);
 void file_read(File_Handle file, uint32 byte_count, void* bytes);
+int32 file_read_i32(File_Handle file);
 uint32 file_read_u32(File_Handle file); // todo(jbr) get rid of functions to read individual u32s etc, instead read chunk into buffer and read buffer
 uint16 file_read_u16(File_Handle file);
 float32 file_read_f32(File_Handle file);
