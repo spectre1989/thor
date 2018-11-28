@@ -394,11 +394,13 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 	uint32 bin_type_id = file_read_u32(file);
 	assert(bin_type_id == c_bin_geobin_type_id);
 
-	char buffer[64];
-	bin_file_read_string(file, sizeof(buffer), buffer);
-	assert(string_equals(buffer, "Parse6"));
-	bin_file_read_string(file, sizeof(buffer), buffer);
-	assert(string_equals(buffer, "Files1"));
+	{
+		char buffer[8];
+		bin_file_read_string(file, sizeof(buffer), buffer);
+		assert(string_equals(buffer, "Parse6"));
+		bin_file_read_string(file, sizeof(buffer), buffer);
+		assert(string_equals(buffer, "Files1"));
+	}
 
 	uint32 files_section_size = file_read_u32(file);
 	file_skip(file, files_section_size);
@@ -415,7 +417,7 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 	{
 		const char* name;
 		Vec_3f position;
-		Vec_3f rotation;
+		Quat rotation;
 	};
 
 	struct Def
@@ -449,7 +451,8 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 			bin_file_read_string(file, temp_allocator, &group->name);
 			
 			group->position = file_read_vec_3f(file);
-			group->rotation = file_read_vec_3f(file);
+			Vec_3f euler = file_read_vec_3f(file);
+			group->rotation = quat_euler(euler);
 
 			file_skip(file, 4); // flags
 		}
@@ -544,6 +547,43 @@ void geobin_file_read(File_Handle file, Matrix_4x4* /*object_matrices*/, int32 /
 		}
 
 		bin_file_skip_string(file); // "SoundScript"
+	}
+
+	uint32 ref_count = file_read_u32(file);
+	for (uint32 ref_i = 0; ref_i < ref_count; ++ref_i)
+	{
+		file_skip(file, 4);
+
+		char buffer[256];
+		bin_file_read_string(file, sizeof(buffer), buffer);
+		Vec_3f position = file_read_vec_3f(file);
+		Vec_3f euler = file_read_vec_3f(file);
+		Quat rotation = quat_euler(euler);
+
+		// todo(jbr) match the coordinate system of CoX
+
+		// something like this
+		recursive_func(buffer, position, euler);
+		
+		void recursive_func(const char* def_name, Vec_3f world_position, Quat world_rotation)
+		{
+			Def* def = find_def(buffer);
+			Group* group_end = def->groups[def->group_count];
+			for (Group* group = def->groups; group != group_end; ++group)
+			{
+				Vec_3f group_world_position = quat_mul(world_rotation, group->position) + world_position;
+				Quat group_world_rotation = quat_mul(world_rotation, group->rotation); // todo(jbr) is that right?
+
+				if (string_starts_with(group->name, "grp"))
+				{
+					recursive_func(group->name, group_world_position group_world_rotation);
+				}
+				else
+				{
+					// find geo
+				}
+			}
+		}
 	}
 
 	/*
