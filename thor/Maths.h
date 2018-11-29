@@ -34,6 +34,8 @@ struct Matrix_4x4
 };
 
 
+int32 i32_min(int32 a, int32 b);
+
 float32 f32_clamp(float32 f, float32 min, float32 max);
 
 Vec_3f vec_3f(float32 x, float32 y, float32 z);

@@ -4,7 +4,6 @@
 #include "Geo_File.h"
 #include "Graphics.h"
 #include "Memory.h"
-#include "Pigg_File.h"
 #include "String.h"
 #include <cmath>
 #include <Windows.h>
@@ -121,7 +120,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	{
 		const char* coh_data_path = cmd_line;
 		char geobin_file_path[256];
-		string_concat(coh_data_path, "\\geobin\\maps\\City_Zones\\City_01_02\\City_01_02.bin", geobin_file_path);
+		string_concat(geobin_file_path, sizeof(geobin_file_path), coh_data_path, "\\geobin\\maps\\City_Zones\\City_01_01\\City_01_01.bin");
 		File_Handle geobin_file = file_open_read(geobin_file_path);
 		geobin_file_read(geobin_file, coh_data_path, matrices, c_max_objects_in_scene, &num_objects_in_scene, &temp_allocator);
 		file_close(geobin_file);

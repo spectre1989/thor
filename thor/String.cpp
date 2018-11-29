@@ -1,5 +1,7 @@
 #include "String.h"
 
+#include "Maths.h"
+
 
 
 int32 string_length(const char* s)
@@ -91,8 +93,8 @@ int32 string_copy(char* dst, int32 dst_size, const char* src)
 
 int32 string_copy(char* dst, int32 dst_size, const char* src, int32 count)
 {
+	assert(count);
 	assert(count < dst_size);
-	count = i32_min(count, dst_size - 1);
 
 	const char* src_end = &src[count];
 	for (; src != src_end; ++src, ++dst)
@@ -111,4 +113,23 @@ int32 string_concat(char* dst, int32 dst_size, const char* s1, const char* s2)
 	string_length += string_copy(&dst[string_length], dst_size - string_length, s2);
 
 	return string_length;
+}
+
+void string_to_lower(char* str)
+{
+	while(true)
+	{
+		char c = *str;
+		if (c >= 'A' && c <= 'Z')
+		{
+			c += 'a' - 'A';
+			*str = c;
+		}
+		else if(!c)
+		{
+			break;
+		}
+
+		++str;
+	}
 }

@@ -342,7 +342,7 @@ void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
 	}
 }
 
-void bin_file_read_string(File_Handle file, Linear_Allocator* allocator, const char** out_string)
+void bin_file_read_string(File_Handle file, Linear_Allocator* allocator, char** out_string)
 {
 	uint16 string_length = file_read_u16(file);
 	
@@ -399,7 +399,13 @@ struct Def
 	int32 group_count;
 };
 
-static void recursively_read_def(const char* object_library_path, Def* defs, int32 def_count, const char* def_name, Vec_3f parent_position, Quat parent_rotation)
+struct Geo
+{
+	const char* name;
+	Geo* next;
+};
+
+static void recursively_read_def(const char* object_library_path, Def* defs, int32 def_count, Geo** geos, Linear_Allocator* allocator, const char* def_name, Vec_3f parent_position, Quat parent_rotation)
 {
 	Def* def = defs;
 	Def* def_end = &defs[def_count];
@@ -420,28 +426,52 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 
 		if (string_starts_with(group->name, "grp"))
 		{
-			recursively_read_def(object_library_path, defs, def_count, group->name, world_position, world_rotation);
+			recursively_read_def(object_library_path, defs, def_count, geos, allocator, group->name, world_position, world_rotation);
 		}
 		else
 		{
-			char geo_file_path[256];
-			string_concat(object_library_path, group->name, geo_file_path);
-
-			int32 last_slash = string_find_last(geo_file_path, '/');
-			char model_name[64];
-			string_copy(&geo_file_path[last_slash + 1], model_name);
-
-			int32 second_to_last_slash = string_find_last(geo_file_path, '/', last_slash - 1);
-			char geo_name[64];
-			int32 geo_name_length = string_copy(&geo_file_path[second_to_last_slash + 1], last_slash - second_to_last_slash - 1, geo_name);
-
-			string_copy(geo_name, &geo_file_path[last_slash + 1]);
-			string_copy(".geo", &geo_file_path[last_slash + geo_name_length + 1]);
-
-			File_Handle geo_file = file_open_read(geo_file_path);
-			if (file_is_valid(geo_file))
+			Geo* geo = *geos;
+			while (geo)
 			{
-				file_close(geo_file);
+				if (string_equals(geo->name, group->name))
+				{
+					break;
+				}
+				geo = geo->next;
+			}
+
+			if (!geo)
+			{
+				geo = (Geo*)linear_allocator_alloc(allocator, sizeof(Geo));
+				
+				// make this the new head
+				geo->next = *geos;
+				*geos = geo;
+
+				int32 name_size = string_length(group->name) + 1;
+				char* name = (char*)linear_allocator_alloc(allocator, name_size);
+				string_copy(name, name_size, group->name);
+				geo->name = name;
+
+				char geo_file_path[256];
+				string_concat(geo_file_path, sizeof(geo_file_path), object_library_path, group->name);
+
+				int32 last_slash = string_find_last(geo_file_path, '/');
+				char model_name[64];
+				string_copy(model_name, sizeof(model_name), &geo_file_path[last_slash + 1]);
+
+				int32 second_to_last_slash = string_find_last(geo_file_path, '/', last_slash - 1);
+				char geo_name[64];
+				int32 geo_name_length = string_copy(geo_name, sizeof(geo_name), &geo_file_path[second_to_last_slash + 1], last_slash - second_to_last_slash - 1);
+
+				string_copy(&geo_file_path[last_slash + 1], sizeof(geo_file_path) - (last_slash + 1), geo_name);
+				string_copy(&geo_file_path[last_slash + geo_name_length + 1], sizeof(geo_file_path) - (last_slash + geo_name_length + 1), ".geo");
+
+				File_Handle geo_file = file_open_read(geo_file_path);
+				if (file_is_valid(geo_file))
+				{
+					file_close(geo_file);
+				}
 			}
 		}
 	}
@@ -485,12 +515,15 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 		file_skip(file, 4); // size
 
-		bin_file_read_string(file, temp_allocator, &def->name);
+		char* name;
+		bin_file_read_string(file, temp_allocator, &name);
+		string_to_lower(name);
+		def->name = name;
 		
 		int32 group_count = file_read_i32(file);
 
 		def->group_count = group_count;
-		def->groups = (Group*)linear_allocator_alloc(temp_allocator, sizeof(Group) * group_count);
+		def->groups = group_count ? (Group*)linear_allocator_alloc(temp_allocator, sizeof(Group) * group_count) : nullptr;
 
 		for (int32 group_i = 0; group_i < group_count; ++group_i)
 		{
@@ -498,7 +531,9 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 			file_skip(file, 4); // size
 
-			bin_file_read_string(file, temp_allocator, &group->name);
+			bin_file_read_string(file, temp_allocator, &name);
+			string_to_lower(name);
+			group->name = name;
 			
 			group->position = file_read_vec_3f(file);
 			Vec_3f euler_degrees = file_read_vec_3f(file);
@@ -601,7 +636,9 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 	}
 
 	char object_library_path[256];
-	string_concat(coh_data_path, "\\object_library\\", object_library_path);
+	string_concat(object_library_path, sizeof(object_library_path), coh_data_path, "\\object_library\\");
+
+	Geo* geos = nullptr;
 
 	int32 ref_count = file_read_i32(file);
 	for (int32 ref_i = 0; ref_i < ref_count; ++ref_i)
@@ -610,6 +647,7 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 		char def_name[256];
 		bin_file_read_string(file, sizeof(def_name), def_name);
+		string_to_lower(def_name);
 		Vec_3f position = file_read_vec_3f(file);
 		Vec_3f euler_degrees = file_read_vec_3f(file);
 		Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);
@@ -617,7 +655,7 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 		// todo(jbr) match the coordinate system of CoX
 
-		recursively_read_def(object_library_path, defs, def_count, def_name, position, rotation);
+		recursively_read_def(object_library_path, defs, def_count, &geos, temp_allocator, def_name, position, rotation);
 	}
 
 	/*

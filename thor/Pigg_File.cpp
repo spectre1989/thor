@@ -28,8 +28,8 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 
 	uint32 file_sig = file_read_u32(file);
 	assert(file_sig == c_pigg_file_sig);
-	//uint16 unknown = file_read_u16(file); disabling warning
-	//uint16 version = file_read_u16(file); disabling warning
+	file_skip(file, 2); //uint16 unknown
+	file_skip(file, 2); //uint16 version
 	uint16 header_size = file_read_u16(file);
 	assert(header_size == 16);
 	uint16 used_header_bytes = file_read_u16(file);
@@ -107,7 +107,7 @@ void unpack_pigg_file(const char* file_name, Linear_Allocator* allocator)
 		assert(entry->name_id < file_names_table_count);
 
 		char path_buffer[512];
-		string_concat("unpacked/", file_names[entry->name_id], path_buffer);
+		string_concat(path_buffer, sizeof(path_buffer), "unpacked/", file_names[entry->name_id]);
 
 		for (uint32 string_i = 0; path_buffer[string_i]; ++string_i)
 		{

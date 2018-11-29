@@ -4,6 +4,12 @@
 
 
 
+int32 i32_min(int32 a, int32 b)
+{
+	return a < b ? a : b;
+}
+
+
 float32 f32_clamp(float32 f, float32 min, float32 max)
 {
 	if (f >= min)
