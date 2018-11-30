@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include "File.h"
+#include "Geo_File.h"
 #include "Memory.h"
 #include "String.h"
 
@@ -711,6 +712,44 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 		// todo(jbr) match the coordinate system of CoX
 
 		recursively_read_def(object_library_path, defs, def_count, &geos, temp_allocator, def_name, position, rotation);
+	}
+
+	Geo* geo = geos;
+	while (geo)
+	{
+		int32 last_slash = string_find_last(geo->name, '/');
+		char file_name[64];
+		string_concat(file_name, sizeof(file_name), &geo->name[last_slash + 1], ".geo");
+
+		char geo_path[256];
+		int32 length = string_concat(geo_path, sizeof(geo_path), object_library_path, geo->name);
+		length += string_copy(&geo_path[length], sizeof(geo_path) - length, "/");
+		string_copy(&geo_path[length], sizeof(geo_path) - length, file_name);
+
+		File_Handle geo_file = file_open_read(geo_path);
+		if (file_is_valid(geo_file))
+		{
+			int32 model_count = 0;
+			Model* model = geo->models;
+			while (model)
+			{
+				++model_count;
+				model = model->next;
+			}
+			const char** model_names = (const char**)linear_allocator_alloc(temp_allocator, sizeof(const char*) * model_count);
+			int32 model_i = 0;
+			model = geo->models;
+			while (model)
+			{
+				model_names[model_i++] = model->name;
+				model = model->next;
+			}
+
+			geo_file_read(geo_file, model_names, model_count, temp_allocator);
+			file_close(geo_file);
+		}
+
+		geo = geo->next;
 	}
 
 	/*

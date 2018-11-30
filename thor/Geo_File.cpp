@@ -429,3 +429,69 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 		assert((header - lod_section) <= lod_section_size);
 	}*/
 }
+
+void geo_file_read(File_Handle file, const char** model_names, int32 model_count, Linear_Allocator* allocator)
+{
+	uint32 header_size = file_read_u32(file);
+
+	// determine version of .geo format
+	uint32 deflated_header_size;
+	uint32 inflated_header_size;
+	uint32 version;
+
+	// in versions > 0, the second u32 will be 0, followed by a u32 version number
+	// in version 0, inflated header data size follows the header size field
+	uint32 field_2 = file_read_u32(file);
+	if (field_2 == 0)
+	{
+		version = file_read_u32(file);
+		inflated_header_size = file_read_u32(file);
+		deflated_header_size = header_size - 12;
+	}
+	else
+	{
+		version = 0;
+		inflated_header_size = field_2;
+		deflated_header_size = header_size - 4;
+	}
+
+	uint8* deflated_header_bytes = linear_allocator_alloc(allocator, deflated_header_size);
+	uint8* inflated_header_bytes = linear_allocator_alloc(allocator, inflated_header_size);
+
+	file_read(file, deflated_header_size, deflated_header_bytes);
+	uint32 file_end_of_header_pos = file_get_position(file); file_end_of_header_pos;
+
+	uint32 bytes_inflated = zlib_inflate_bytes(deflated_header_bytes, deflated_header_size, inflated_header_bytes, inflated_header_size);
+	assert(bytes_inflated == inflated_header_size);
+
+	// I24 contains geos of version 0, 2, 3, 4, 5, 7, 8
+	assert(version != 1 && version != 6 && version <= 8);
+
+	uint8* header = inflated_header_bytes;
+
+	// info
+	buffer_skip(&header, 4); // geo data size (think this is combined tris/verts/normals/uvs/etc
+	uint32 texture_names_section_size = buffer_read_u32(&header);
+	uint32 bone_names_section_size = buffer_read_u32(&header); bone_names_section_size;
+	uint32 texture_binds_section_size = buffer_read_u32(&header); texture_binds_section_size;
+	uint32 lod_section_size;
+	if (version >= 2 && version <= 5)
+	{
+		lod_section_size = buffer_read_u32(&header);
+	}
+	else
+	{
+		lod_section_size = 0;
+	}
+
+	// texture names
+	uint8* texture_names_section = header;
+	uint32 geo_texture_count = buffer_read_u32(&header); geo_texture_count;
+	header = texture_names_section + texture_names_section_size;
+
+	// bone names
+	model_names; model_count;
+	uint8* bone_names_section = header; bone_names_section;
+	uint32 bone_name_count = buffer_read_u32(&header);
+	bone_name_count++;
+}
