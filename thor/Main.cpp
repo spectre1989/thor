@@ -107,13 +107,13 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	bool32 was_sleep_granularity_set = timeBeginPeriod(1) == TIMERR_NOERROR;
 
 	Linear_Allocator allocator;
-	linear_allocator_create(&allocator, megabytes(1));
+	linear_allocator_create(&allocator, megabytes(32));
 
 	Linear_Allocator temp_allocator;
-	linear_allocator_create(&temp_allocator, megabytes(16));
+	linear_allocator_create_sub_allocator(&allocator, &temp_allocator, megabytes(16));
 
 	constexpr int32 c_max_objects_in_scene = 1024;
-	Matrix_4x4* matrices = (Matrix_4x4*)linear_allocator_alloc(&allocator, sizeof(Matrix_4x4) * c_max_objects_in_scene);
+	Matrix_4x4* matrices = nullptr;
 	int32 num_objects_in_scene = 0;
 
 	if (string_length(cmd_line))

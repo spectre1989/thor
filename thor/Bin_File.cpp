@@ -399,9 +399,24 @@ struct Def
 	int32 group_count;
 };
 
+struct Model_Instance
+{
+	Vec_3f position;
+	Quat rotation;
+	Model_Instance* next;
+};
+
+struct Model
+{
+	const char* name;
+	Model_Instance* instances;
+	Model* next;
+};
+
 struct Geo
 {
 	const char* name;
+	Model* models;
 	Geo* next;
 };
 
@@ -430,10 +445,19 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 		}
 		else
 		{
+			int32 last_slash = string_find_last(group->name, '/');
+			
+			char geo_name[256];
+			int32 geo_name_length = last_slash;
+			string_copy(geo_name, sizeof(geo_name), group->name, geo_name_length);
+			
+			char model_name[64];
+			int32 model_name_length = string_copy(model_name, sizeof(model_name), &group->name[last_slash + 1]);
+
 			Geo* geo = *geos;
 			while (geo)
 			{
-				if (string_equals(geo->name, group->name))
+				if (string_equals(geo->name, geo_name))
 				{
 					break;
 				}
@@ -443,17 +467,17 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 			if (!geo)
 			{
 				geo = (Geo*)linear_allocator_alloc(allocator, sizeof(Geo));
+				*geo = {};
 				
 				// make this the new head
 				geo->next = *geos;
 				*geos = geo;
 
-				int32 name_size = string_length(group->name) + 1;
-				char* name = (char*)linear_allocator_alloc(allocator, name_size);
-				string_copy(name, name_size, group->name);
+				char* name = (char*)linear_allocator_alloc(allocator, geo_name_length + 1);
+				string_copy(name, geo_name_length + 1, geo_name);
 				geo->name = name;
 
-				char geo_file_path[256];
+				/*char geo_file_path[256];
 				string_concat(geo_file_path, sizeof(geo_file_path), object_library_path, group->name);
 
 				int32 last_slash = string_find_last(geo_file_path, '/');
@@ -471,8 +495,39 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 				if (file_is_valid(geo_file))
 				{
 					file_close(geo_file);
-				}
+				}*/
 			}
+
+			Model* model = geo->models; // todo(jbr) compression?
+			while (model)
+			{
+				if (string_equals(model->name, model_name))
+				{
+					break;
+				}
+				model = model->next;
+			}
+
+			if (!model)
+			{
+				model = (Model*)linear_allocator_alloc(allocator, sizeof(Model));
+				*model = {};
+
+				model->next = geo->models;
+				geo->models = model;
+
+				char* name = (char*)linear_allocator_alloc(allocator, model_name_length + 1);
+				string_copy(name, model_name_length + 1, model_name);
+				model->name = name;
+			}
+
+			Model_Instance* model_instance = (Model_Instance*)linear_allocator_alloc(allocator, sizeof(Model_Instance));
+			*model_instance = {};
+
+			model_instance->position = world_position;
+			model_instance->rotation = world_rotation;
+			model_instance->next = model->instances;
+			model->instances = model_instance;
 		}
 	}
 }
