@@ -509,6 +509,7 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 	buffer_skip(&header, 12);
 	
 	uint32 geo_model_count = buffer_read_u32(&header);
+
 	for (uint32 model_i = 0; model_i < geo_model_count; ++model_i)
 	{
 		uint8* model = header;
@@ -540,7 +541,7 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 			model_vertex_count = *(uint32*)&model[28];
 			model_triangle_count = *(uint32*)&model[32];
 			model_texture_binds_offset = *(uint32*)&model[36];
-			model_name = (const char*)&bone_names_section[*(uint32*)&model[80]]; // todo(jbr) test this with version 2 geos
+			model_name = (const char*)&bone_names_section[*(uint32*)&model[80]];
 			deflated_triangle_data_size = *(uint32*)&model[132];
 			inflated_triangle_data_size = *(uint32*)&model[136];
 			triangle_data_offset = *(uint32*)&model[140];
