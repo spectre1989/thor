@@ -31,6 +31,37 @@ bool string_equals(const char* a, const char* b)
 	return false;
 }
 
+static char char_to_lower(char c)
+{
+	if (c >= 'A' && c <= 'Z')
+	{
+		c += 'a' - 'A';
+	}
+
+	return c;
+}
+
+static bool char_equals_ignore_case(char a, char b)
+{
+	return char_to_lower(a) == char_to_lower(b);
+}
+
+bool string_equals_ignore_case(const char* a, const char* b)
+{
+	while (char_equals_ignore_case(*a, *b))
+	{
+		if (!*a)
+		{
+			return true;
+		}
+
+		++a;
+		++b;
+	}
+
+	return false;
+}
+
 bool string_starts_with(const char* str, const char* starts_with)
 {
 	while (*starts_with && *str == *starts_with)
@@ -42,6 +73,48 @@ bool string_starts_with(const char* str, const char* starts_with)
 	if (!*starts_with)
 	{
 		return true;
+	}
+
+	return false;
+}
+
+bool string_starts_with_ignore_case(const char* str, const char* starts_with)
+{
+	while (*starts_with && char_equals_ignore_case(*str, *starts_with))
+	{
+		++str;
+		++starts_with;
+	}
+
+	if (!*starts_with)
+	{
+		return true;
+	}
+
+	return false;
+}
+
+bool string_contains(const char* str, const char* contains)
+{
+	while(*str)
+	{
+		const char* contains_iter = contains;
+		while (*str == *contains_iter)
+		{
+			++str;
+			++contains_iter;
+
+			if (!*contains_iter)
+			{
+				return true;
+			}
+			else if (!*str)
+			{
+				return false;
+			}
+		}
+
+		++str;
 	}
 
 	return false;
@@ -120,12 +193,10 @@ void string_to_lower(char* str)
 	while(true)
 	{
 		char c = *str;
-		if (c >= 'A' && c <= 'Z')
-		{
-			c += 'a' - 'A';
-			*str = c;
-		}
-		else if(!c)
+		
+		*str = char_to_lower(c);
+		
+		if(!c)
 		{
 			break;
 		}

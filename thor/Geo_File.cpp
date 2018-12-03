@@ -3,6 +3,7 @@
 #include <cmath>
 #include "Buffer.h"
 #include "Memory.h"
+#include "String.h"
 #include "Zlib.h"
 
 
@@ -430,8 +431,15 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	}*/
 }
 
-void geo_file_read(File_Handle file, const char** model_names, int32 model_count, Linear_Allocator* allocator)
-{model_names; model_count; // todo(jbr)
+void geo_file_read(File_Handle file, const char** model_names, int32 model_name_count, Linear_Allocator* allocator)
+{
+	// todo(jbr)
+	bool32* found = (bool32*)linear_allocator_alloc(allocator, sizeof(bool32) * model_name_count);
+	for (int32 i = 0; i < model_name_count; ++i)
+	{
+		found[i] = 0;
+	}
+
 	uint32 header_size = file_read_u32(file);
 
 	// determine version of .geo format
@@ -472,7 +480,7 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 	// info
 	buffer_skip(&header, 4); // geo data size (think this is combined tris/verts/normals/uvs/etc
 	uint32 texture_names_section_size = buffer_read_u32(&header);
-	uint32 bone_names_section_size = buffer_read_u32(&header);
+	uint32 model_names_section_size = buffer_read_u32(&header);
 	uint32 texture_binds_section_size = buffer_read_u32(&header);
 	uint32 lod_section_size;
 	if (version >= 2 && version <= 5)
@@ -484,120 +492,76 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 		lod_section_size = 0;
 	}
 
-	// texture names
-	uint8* texture_names_section = header;
-	uint32 geo_texture_count = buffer_read_u32(&header); geo_texture_count;
-	header = texture_names_section + texture_names_section_size;
+	header += texture_names_section_size;
 
-	// bone names
-	uint8* bone_names_section = header;
-	header = bone_names_section + bone_names_section_size;
+	uint8* model_names_section = header;
+	
+	header += model_names_section_size;
+	header += texture_binds_section_size;
+	header += lod_section_size;
 
-	// texture binds (used later)
-	uint8* texture_binds_section = header;
-	header = texture_binds_section + texture_binds_section_size;
-
-	// lod section
-	uint8* lod_section = header;
-	header = lod_section + lod_section_size;
-
-	// geoset header
-	constexpr uint32 c_name_size = 124;
-	char geo_name[c_name_size];
-	buffer_read_bytes(&header, c_name_size, (uint8*)geo_name);
+	buffer_skip(&header, 124); // geo name
 
 	buffer_skip(&header, 12);
 	
-	uint32 geo_model_count = buffer_read_u32(&header);
+	uint32 model_count = buffer_read_u32(&header);
 
-	for (uint32 model_i = 0; model_i < geo_model_count; ++model_i)
+	for (uint32 model_i = 0; model_i < model_count; ++model_i)
 	{
 		uint8* model = header;
 
 		const char* model_name;
-		uint32	model_flags;
-		float32 model_radius;
-		uint32	model_texture_count;
 		uint32	model_vertex_count;
 		uint32	model_triangle_count;
-		uint32	model_texture_binds_offset;
 		uint32	deflated_triangle_data_size;
 		uint32	inflated_triangle_data_size;
 		uint32	triangle_data_offset;
 		uint32	deflated_vertex_data_size;
 		uint32	inflated_vertex_data_size;
 		uint32	vertex_data_offset;
-		uint32	deflated_normal_data_size;
-		uint32	inflated_normal_data_size;
-		uint32	normal_data_offset;
-		uint32	deflated_texcoord_data_size;
-		uint32	inflated_texcoord_data_size;
-		uint32	texcoord_data_offset;
 		if (version <= 2) // 0, 2
 		{
-			model_flags = *(uint32*)&model[0];
-			model_radius = *(float32*)&model[4];
-			model_texture_count = *(uint32*)&model[12];
 			model_vertex_count = *(uint32*)&model[28];
 			model_triangle_count = *(uint32*)&model[32];
-			model_texture_binds_offset = *(uint32*)&model[36];
-			model_name = (const char*)&bone_names_section[*(uint32*)&model[80]];
+			model_name = (const char*)&model_names_section[*(uint32*)&model[80]];
 			deflated_triangle_data_size = *(uint32*)&model[132];
 			inflated_triangle_data_size = *(uint32*)&model[136];
 			triangle_data_offset = *(uint32*)&model[140];
 			deflated_vertex_data_size = *(uint32*)&model[144];
 			inflated_vertex_data_size = *(uint32*)&model[148];
 			vertex_data_offset = *(uint32*)&model[152];
-			deflated_normal_data_size = *(uint32*)&model[156];
-			inflated_normal_data_size = *(uint32*)&model[160];
-			normal_data_offset = *(uint32*)&model[164];
-			deflated_texcoord_data_size = *(uint32*)&model[168];
-			inflated_texcoord_data_size = *(uint32*)&model[172];
-			texcoord_data_offset = *(uint32*)&model[176];
 		}
 		else if (version <= 7) // 3, 4, 5, 7
 		{
-			model_flags = *(uint32*)&model[0];
-			model_radius = *(float32*)&model[4];
-			model_texture_count = *(uint32*)&model[8];
 			model_vertex_count = *(uint32*)&model[16];
 			model_triangle_count = *(uint32*)&model[20];
-			model_texture_binds_offset = *(uint32*)&model[24];
-			model_name = (const char*)&bone_names_section[*(uint32*)&model[60]];
+			model_name = (const char*)&model_names_section[*(uint32*)&model[60]];
 			deflated_triangle_data_size = *(uint32*)&model[104];
 			inflated_triangle_data_size = *(uint32*)&model[108];
 			triangle_data_offset = *(uint32*)&model[112];
 			deflated_vertex_data_size = *(uint32*)&model[116];
 			inflated_vertex_data_size = *(uint32*)&model[120];
 			vertex_data_offset = *(uint32*)&model[124];
-			deflated_normal_data_size = *(uint32*)&model[128];
-			inflated_normal_data_size = *(uint32*)&model[132];
-			normal_data_offset = *(uint32*)&model[136];
-			deflated_texcoord_data_size = *(uint32*)&model[140];
-			inflated_texcoord_data_size = *(uint32*)&model[144];
-			texcoord_data_offset = *(uint32*)&model[148];
 		}
 		else // 8
 		{
-			model_flags = *(uint32*)&model[0];
-			model_radius = *(float32*)&model[4];
-			model_texture_count = *(uint32*)&model[8];
 			model_vertex_count = *(uint32*)&model[16];
 			model_triangle_count = *(uint32*)&model[20];
-			model_texture_binds_offset = *(uint32*)&model[28];
-			model_name = (const char*)&bone_names_section[*(uint32*)&model[64]];
+			model_name = (const char*)&model_names_section[*(uint32*)&model[64]];
 			deflated_triangle_data_size = *(uint32*)&model[108];
 			inflated_triangle_data_size = *(uint32*)&model[112];
 			triangle_data_offset = *(uint32*)&model[116];
 			deflated_vertex_data_size = *(uint32*)&model[120];
 			inflated_vertex_data_size = *(uint32*)&model[124];
 			vertex_data_offset = *(uint32*)&model[128];
-			deflated_normal_data_size = *(uint32*)&model[132];
-			inflated_normal_data_size = *(uint32*)&model[136];
-			normal_data_offset = *(uint32*)&model[140];
-			deflated_texcoord_data_size = *(uint32*)&model[144];
-			inflated_texcoord_data_size = *(uint32*)&model[148];
-			texcoord_data_offset = *(uint32*)&model[152];
+		}
+
+		for (int32 model_name_i = 0; model_name_i < model_name_count; ++model_name_i)
+		{
+			if (string_contains(model_name, model_names[model_name_i]))
+			{
+				found[model_name_i] = 1;
+			}
 		}
 
 		switch (version)
@@ -625,5 +589,10 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 			assert(false);
 			break;
 		}
+	}
+
+	for (int32 i = 0; i < model_name_count; ++i)
+	{
+		assert(found[i]);
 	}
 }

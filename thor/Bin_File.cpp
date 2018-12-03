@@ -440,7 +440,7 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 		Vec_3f world_position = vec_3f_add(quat_mul(parent_rotation, group->position), parent_position);
 		Quat world_rotation = quat_mul(parent_rotation, group->rotation); // todo(jbr) is that right?
 
-		if (string_starts_with(group->name, "grp"))
+		if (string_starts_with_ignore_case(group->name, "grp"))
 		{
 			recursively_read_def(object_library_path, defs, def_count, geos, allocator, group->name, world_position, world_rotation);
 		}
@@ -477,26 +477,6 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 				char* name = (char*)linear_allocator_alloc(allocator, geo_name_length + 1);
 				string_copy(name, geo_name_length + 1, geo_name);
 				geo->name = name;
-
-				/*char geo_file_path[256];
-				string_concat(geo_file_path, sizeof(geo_file_path), object_library_path, group->name);
-
-				int32 last_slash = string_find_last(geo_file_path, '/');
-				char model_name[64];
-				string_copy(model_name, sizeof(model_name), &geo_file_path[last_slash + 1]);
-
-				int32 second_to_last_slash = string_find_last(geo_file_path, '/', last_slash - 1);
-				char geo_name[64];
-				int32 geo_name_length = string_copy(geo_name, sizeof(geo_name), &geo_file_path[second_to_last_slash + 1], last_slash - second_to_last_slash - 1);
-
-				string_copy(&geo_file_path[last_slash + 1], sizeof(geo_file_path) - (last_slash + 1), geo_name);
-				string_copy(&geo_file_path[last_slash + geo_name_length + 1], sizeof(geo_file_path) - (last_slash + geo_name_length + 1), ".geo");
-
-				File_Handle geo_file = file_open_read(geo_file_path);
-				if (file_is_valid(geo_file))
-				{
-					file_close(geo_file);
-				}*/
 			}
 
 			Model* model = geo->models; // todo(jbr) compression?
@@ -573,7 +553,6 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 		char* name;
 		bin_file_read_string(file, temp_allocator, &name);
-		string_to_lower(name);
 		def->name = name;
 		
 		int32 group_count = file_read_i32(file);
@@ -588,7 +567,6 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 			file_skip(file, 4); // size
 
 			bin_file_read_string(file, temp_allocator, &name);
-			string_to_lower(name);
 			group->name = name;
 			
 			group->position = file_read_vec_3f(file);
@@ -703,7 +681,6 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 		char def_name[256];
 		bin_file_read_string(file, sizeof(def_name), def_name);
-		string_to_lower(def_name);
 		Vec_3f position = file_read_vec_3f(file);
 		Vec_3f euler_degrees = file_read_vec_3f(file);
 		Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);

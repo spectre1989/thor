@@ -60,15 +60,6 @@ static LRESULT CALLBACK window_callback(HWND window_handle, UINT msg, WPARAM w_p
 	return 0;
 }
 
-void on_geo_found(const char* path, void* state)
-{
-	Linear_Allocator* allocator = (Linear_Allocator*)state;
-	linear_allocator_reset(allocator);
-	File_Handle geo_file = file_open_read(path);
-	geo_file_read(geo_file, nullptr, 0, allocator);
-	file_close(geo_file);
-}
-
 // todo(jbr) would it be better to use wall and disable selectively?
 int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle*/, LPSTR cmd_line, int /*cmd_show*/)
 {
@@ -124,11 +115,6 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	constexpr int32 c_max_objects_in_scene = 1024;
 	Matrix_4x4* matrices = nullptr;
 	int32 num_objects_in_scene = 0;
-
-	if (string_length(cmd_line))
-	{
-		file_search(cmd_line, "*.geo", on_geo_found, &temp_allocator);
-	}
 
 	if (string_length(cmd_line))
 	{
