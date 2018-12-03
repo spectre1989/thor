@@ -563,6 +563,7 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 			model_vertex_count = *(uint32*)&model[16];
 			model_triangle_count = *(uint32*)&model[20];
 			model_texture_binds_offset = *(uint32*)&model[24];
+			model_name = (const char*)&bone_names_section[*(uint32*)&model[60]];
 			deflated_triangle_data_size = *(uint32*)&model[104];
 			inflated_triangle_data_size = *(uint32*)&model[108];
 			triangle_data_offset = *(uint32*)&model[112];
@@ -584,6 +585,7 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_count
 			model_vertex_count = *(uint32*)&model[16];
 			model_triangle_count = *(uint32*)&model[20];
 			model_texture_binds_offset = *(uint32*)&model[28];
+			model_name = (const char*)&bone_names_section[*(uint32*)&model[64]];
 			deflated_triangle_data_size = *(uint32*)&model[108];
 			inflated_triangle_data_size = *(uint32*)&model[112];
 			triangle_data_offset = *(uint32*)&model[116];
