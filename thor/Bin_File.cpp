@@ -343,7 +343,7 @@ void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
 	}
 }
 
-void bin_file_read_string(File_Handle file, Linear_Allocator* allocator, char** out_string)
+static char* bin_file_read_string(File_Handle file, Linear_Allocator* allocator)
 {
 	uint16 string_length = file_read_u16(file);
 	
@@ -359,7 +359,7 @@ void bin_file_read_string(File_Handle file, Linear_Allocator* allocator, char** 
 		file_skip(file, 4 - bytes_misaligned);
 	}
 
-	*out_string = str;
+	return str;
 }
 
 static void bin_file_skip_string(File_Handle file)
@@ -453,7 +453,7 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 			string_copy(geo_name, sizeof(geo_name), group->name, geo_name_length);
 			
 			char model_name[64];
-			int32 model_name_length = string_copy(model_name, sizeof(model_name), &group->name[last_slash + 1]);
+			string_copy(model_name, sizeof(model_name), &group->name[last_slash + 1]);
 
 			Geo* geo = *geos;
 			while (geo)
@@ -474,9 +474,7 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 				geo->next = *geos;
 				*geos = geo;
 
-				char* name = (char*)linear_allocator_alloc(allocator, geo_name_length + 1);
-				string_copy(name, geo_name_length + 1, geo_name);
-				geo->name = name;
+				geo->name = string_copy(geo_name, allocator);
 			}
 
 			Model* model = geo->models; // todo(jbr) compression?
@@ -497,9 +495,7 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 				model->next = geo->models;
 				geo->models = model;
 
-				char* name = (char*)linear_allocator_alloc(allocator, model_name_length + 1);
-				string_copy(name, model_name_length + 1, model_name);
-				model->name = name;
+				model->name = string_copy(model_name, allocator);
 			}
 
 			Model_Instance* model_instance = (Model_Instance*)linear_allocator_alloc(allocator, sizeof(Model_Instance));
@@ -513,7 +509,24 @@ static void recursively_read_def(const char* object_library_path, Def* defs, int
 	}
 }
 
-void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /*object_matrices*/, int32 /*num_object_matrices*/, int32* out_num_objects_in_scene, Linear_Allocator* temp_allocator)
+struct Ref
+{
+	const char* name;
+	Vec_3f position;
+	Quat rotation;
+};
+
+struct Geobin
+{
+	const char* relative_path;
+	Def* defs;
+	int32 def_count;
+	Ref* refs;
+	int32 ref_count;
+	Geobin* next;
+};
+
+static void geobin_file_read_single(File_Handle file, const char* relative_path, Linear_Allocator* allocator, Geobin* out_geobin)
 {
 	uint8 sig[8];
 	file_read(file, 8, sig);
@@ -539,26 +552,21 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 	bin_file_skip_string(file); // scene file
 	bin_file_skip_string(file); // loading screen
 
-	int32 matrix_index = 0;
-
 	int32 def_count = file_read_i32(file);
-
-	Def* defs = (Def*)linear_allocator_alloc(temp_allocator, sizeof(Def) * def_count);
-
+	Def* defs = (Def*)linear_allocator_alloc(allocator, sizeof(Def) * def_count);
 	for (int32 def_i = 0; def_i < def_count; ++def_i)
 	{
 		Def* def = &defs[def_i];
 
-		file_skip(file, 4); // size
+		uint32 def_size = file_read_u32(file);
+		uint32 def_start = file_get_position(file);
 
-		char* name;
-		bin_file_read_string(file, temp_allocator, &name);
-		def->name = name;
+		def->name = bin_file_read_string(file, allocator);;
 		
 		int32 group_count = file_read_i32(file);
 
 		def->group_count = group_count;
-		def->groups = group_count ? (Group*)linear_allocator_alloc(temp_allocator, sizeof(Group) * group_count) : nullptr;
+		def->groups = group_count ? (Group*)linear_allocator_alloc(allocator, sizeof(Group) * group_count) : nullptr;
 
 		for (int32 group_i = 0; group_i < group_count; ++group_i)
 		{
@@ -566,9 +574,7 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 
 			file_skip(file, 4); // size
 
-			bin_file_read_string(file, temp_allocator, &name);
-			group->name = name;
-			
+			group->name = bin_file_read_string(file, allocator);
 			group->position = file_read_vec_3f(file);
 			Vec_3f euler_degrees = file_read_vec_3f(file);
 			Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);
@@ -577,6 +583,7 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 			file_skip(file, 4); // flags
 		}
 
+		/*
 		int32 property_count = file_read_i32(file);
 		for (int32 property_i = 0; property_i < property_count; ++property_i)
 		{
@@ -666,30 +673,91 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 			file_skip(file, size);
 		}
 
-		bin_file_skip_string(file); // "SoundScript"
+		bin_file_skip_string(file); // "SoundScript" */
+
+		file_set_position(file, def_start + def_size);
 	}
-
-	char object_library_path[256];
-	string_concat(object_library_path, sizeof(object_library_path), coh_data_path, "\\object_library\\");
-
-	Geo* geos = nullptr;
 
 	int32 ref_count = file_read_i32(file);
+	Ref* refs = (Ref*)linear_allocator_alloc(allocator, sizeof(Ref) * ref_count);
+
 	for (int32 ref_i = 0; ref_i < ref_count; ++ref_i)
 	{
-		file_skip(file, 4);
+		Ref* ref = &refs[ref_i];
 
-		char def_name[256];
-		bin_file_read_string(file, sizeof(def_name), def_name);
-		Vec_3f position = file_read_vec_3f(file);
+		file_skip(file, 4); // size
+
+		ref->name = bin_file_read_string(file, allocator);
+		ref->position = file_read_vec_3f(file);
 		Vec_3f euler_degrees = file_read_vec_3f(file);
 		Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);
-		Quat rotation = quat_euler(euler);
+		ref->rotation = quat_euler(euler);
 
 		// todo(jbr) match the coordinate system of CoX
-
-		recursively_read_def(object_library_path, defs, def_count, &geos, temp_allocator, def_name, position, rotation);
 	}
+
+	uint32 import_count = file_read_u32(file);
+	assert(import_count == 0); // todo(jbr) does this get used by anything?
+
+	*out_geobin = {};
+	out_geobin->relative_path = string_copy(relative_path, allocator);
+	out_geobin->defs = defs;
+	out_geobin->def_count = def_count;
+	out_geobin->refs = refs;
+	out_geobin->ref_count = ref_count;
+}
+
+void geobin_file_read(File_Handle file, const char* relative_path, const char* geobin_base_path, const char* /*geo_base_path*/, Matrix_4x4* /*object_matrices*/, int32 /*num_object_matrices*/, int32* /*out_num_objects_in_scene*/, Linear_Allocator* temp_allocator)
+{
+	Geobin* root_geobin = (Geobin*)linear_allocator_alloc(temp_allocator, sizeof(Geobin));
+	geobin_file_read_single(file, relative_path, temp_allocator, root_geobin);
+
+	Geobin* geobin = root_geobin;
+	while (geobin)
+	{
+		Def* def_end = &geobin->defs[geobin->def_count];
+		for (Def* def = geobin->defs; def != def_end; ++def)
+		{
+			if (!string_starts_with_ignore_case(def->name, "grp"))
+			{
+				bool was_found = false;
+				for (Geobin* geobin_iter = root_geobin; geobin_iter; geobin_iter = geobin_iter->next)
+				{
+					if (string_equals(def->name, geobin_iter->relative_path))
+					{
+						was_found = true;
+						break;
+					}
+					assert(!string_equals_ignore_case(def->name, geobin_iter->relative_path));
+				}
+
+				if (!was_found)
+				{
+					int32 last_slash = string_find_last(def->name, '/');
+					char geobin_file_name[64];
+					string_concat(geobin_file_name, sizeof(geobin_file_name), &def->name[last_slash + 1], ".bin");
+
+					char geobin_path[256];
+					int32 length = string_concat(geobin_path, sizeof(geobin_path), geobin_base_path, def->name);
+					length += string_copy(&geobin_path[length], sizeof(geobin_path) - length, "\\");
+					string_copy(&geobin_path[length], sizeof(geobin_path) - length, geobin_file_name);
+
+					File_Handle geobin_file = file_open_read(geobin_path);
+					if (file_is_valid(geobin_file))
+					{
+						Geobin* child_geobin = (Geobin*)linear_allocator_alloc(temp_allocator, sizeof(Geobin));
+						geobin_file_read_single(geobin_file, def->name, temp_allocator, child_geobin);
+
+						file_close(geobin_file);
+					}
+				}
+			}
+		}
+
+		geobin = geobin->next;
+	}
+	/*char object_library_path[256];
+	string_concat(object_library_path, sizeof(object_library_path), coh_data_path, "\\object_library\\");
 
 	Geo* geo = geos;
 	while (geo)
@@ -727,221 +795,5 @@ void geobin_file_read(File_Handle file, const char* coh_data_path, Matrix_4x4* /
 		}
 
 		geo = geo->next;
-	}
-
-	/*
-	//
-	char buffer[512];
-	bin_file_read_string(file, sizeof(buffer), buffer); // scene file
-	bin_file_read_string(file, sizeof(buffer), buffer); // loading screen
-
-	uint32 def_count = file_read_u32(file);
-	for (uint32 def_i = 0; def_i < def_count; ++def_i)
-	{
-		//uint32 def_size = file_read_u32(file);
-
-		bin_file_read_string(file, sizeof(buffer), buffer); // name
-
-		uint32 group_count = file_read_u32(file);
-		for (uint32 group_i = 0; group_i < group_count; ++group_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			bin_file_read_string(file, sizeof(buffer), buffer); // name
-			Vec_3f pos = file_read_vec_3f(file);
-			Vec_3f rot = file_read_vec_3f(file);
-			//uint32 flags = file_read_u32(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 property_count = file_read_u32(file);
-		for (uint32 property_i = 0; property_i < property_count; ++property_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
-			bin_file_read_string(file, sizeof(buffer), buffer);
-			//uint32 u32 = file_read_u32(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 tint_color_count = file_read_u32(file);
-		for (uint32 tint_color_i = 0; tint_color_i < tint_color_count; ++tint_color_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//uint32 col_1 = bin_file_read_color(file);	// todo(jbr) what are these?
-			//uint32 col_2 = bin_file_read_color(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 ambient_count = file_read_u32(file);
-		for (uint32 ambient_i = 0; ambient_i < ambient_count; ++ambient_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//uint32 color = bin_file_read_color(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 omni_count = file_read_u32(file);
-		for (uint32 omni_i = 0; omni_i < omni_count; ++omni_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//uint32 color = bin_file_read_color(file);
-			//float32 f32 = file_read_f32(file); // todo(jbr) what are these?
-			//uint32 flags = file_read_u32(file); // todo(jbr) document all the flags
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 cubemap_count = file_read_u32(file);
-		for (uint32 cubemap_i = 0; cubemap_i < cubemap_count; ++cubemap_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//uint32 u_1 = file_read_u32(file); // todo(jbr) what are these? default = 256
-			//uint32 u_2 = file_read_u32(file); // default = 1024
-			//float32 f_1 = file_read_f32(file);
-			//float32 f_2 = file_read_f32(file);	// default = 12
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 volume_count = file_read_u32(file);
-		for (uint32 volume_i = 0; volume_i < volume_count; ++volume_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//float32 f_1 = file_read_f32(file); // todo(jbr) what are these? width/height/depth?
-			//float32 f_2 = file_read_f32(file);
-			//float32 f_3 = file_read_f32(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 sound_count = file_read_u32(file);
-		for (uint32 sound_i = 0; sound_i < sound_count; ++sound_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
-			//float32 f_1 = file_read_f32(file);
-			//float32 f_2 = file_read_f32(file);
-			//float32 f_3 = file_read_f32(file);
-			//uint32 flags = file_read_u32(file); // 1 = exclude
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 replace_tex_count = file_read_u32(file);
-		for (uint32 replace_tex_i = 0; replace_tex_i < replace_tex_count; ++replace_tex_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//uint32 u32 = file_read_u32(file);						// tex_unit
-			bin_file_read_string(file, sizeof(buffer), buffer);		// tex_name
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 beacon_count = file_read_u32(file);
-		for (uint32 beacon_i = 0; beacon_i < beacon_count; ++beacon_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			bin_file_read_string(file, sizeof(buffer), buffer); // name
-			//float32 f32 = file_read_f32(file);					// radius
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 fog_count = file_read_u32(file);
-		for (uint32 fog_i = 0; fog_i < fog_count; ++fog_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			// todo(jbr) what are these, maybe radius, near, far, colours, f_4?
-			//float32 f_1 = file_read_f32(file);
-			//float32 f_2 = file_read_f32(file);
-			//float32 f_3 = file_read_f32(file);
-			//uint32 col_1 = bin_file_read_color(file);
-			//uint32 col_2 = bin_file_read_color(file);
-			//float32 f_4 = file_read_f32(file); // todo(jbr) document all defaults // default = 1
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		uint32 lod_count = file_read_u32(file);
-		for (uint32 lod_i = 0; lod_i < lod_count; ++lod_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			//float32 lod_far = file_read_f32(file);
-			//float32 lod_far_fade = file_read_f32(file);
-			//float32 lod_scale = file_read_f32(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		bin_file_read_string(file, sizeof(buffer), buffer); // "Type"
-		//uint32 flags = file_read_u32(file);
-		//float32 alpha = file_read_f32(file);
-		bin_file_read_string(file, sizeof(buffer), buffer); // "Obj"
-
-		uint32 tex_swap_count = file_read_u32(file);
-		for (uint32 tex_swap_i = 0; tex_swap_i < tex_swap_count; ++tex_swap_i)
-		{
-			uint32 size = file_read_u32(file);
-			uint32 start = file_get_position(file);
-
-			bin_file_read_string(file, sizeof(buffer), buffer); // todo(jbr) what are these?
-			bin_file_read_string(file, sizeof(buffer), buffer);
-			//uint32 u32 = file_read_u32(file);
-
-			assert((file_get_position(file) - start) == size);
-		}
-
-		bin_file_read_string(file, sizeof(buffer), buffer); // "SoundScript"
-	}
-
-	uint32 ref_count = file_read_u32(file);
-	for (uint32 ref_i = 0; ref_i < ref_count; ++ref_i)
-	{
-		uint32 size = file_read_u32(file);
-		uint32 start = file_get_position(file);
-
-		bin_file_read_string(file, sizeof(buffer), buffer); // name
-		//Vec3 pos = file_read_vec3(file);
-		//Vec3 rot = file_read_vec3(file);
-
-		assert((file_get_position(file) - start) == size);
-	}
-
-	// this is in the schema, but no files seem to use it
-	uint32 import_count = file_read_u32(file);
-	for (uint32 import_i = 0; import_i < import_count; ++import_i)
-	{
-		bin_file_read_string(file, sizeof(buffer), buffer);
-	}
-	*/
-
-	*out_num_objects_in_scene = matrix_index;
+	}*/
 }

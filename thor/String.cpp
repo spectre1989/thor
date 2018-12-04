@@ -1,6 +1,7 @@
 #include "String.h"
 
 #include "Maths.h"
+#include "Memory.h"
 
 
 
@@ -178,6 +179,16 @@ int32 string_copy(char* dst, int32 dst_size, const char* src, int32 count)
 	*dst = 0;
 
 	return count;
+}
+
+char* string_copy(const char* src, struct Linear_Allocator* allocator)
+{
+	int32 size = string_length(src) + 1;
+	char* dst = (char*)linear_allocator_alloc(allocator, size);
+
+	string_copy(dst, size, src);
+
+	return dst;
 }
 
 int32 string_concat(char* dst, int32 dst_size, const char* s1, const char* s2)
