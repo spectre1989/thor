@@ -129,7 +129,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		char geo_base_path[256];
 		string_concat(geo_base_path, sizeof(geo_base_path), coh_data_path, "\\object_library\\");
 
-		geobin_file_read(geobin_file, "maps\\City_Zones\\City_01_01\\City_01_01.bin", geobin_base_path, geo_base_path, matrices, c_max_objects_in_scene, &num_objects_in_scene, &temp_allocator);
+		geobin_file_read(geobin_file, "maps\\City_Zones\\City_01_01", geobin_base_path, geo_base_path, matrices, c_max_objects_in_scene, &num_objects_in_scene, &temp_allocator);
 		file_close(geobin_file);
 	}
 

@@ -121,6 +121,21 @@ bool string_contains(const char* str, const char* contains)
 	return false;
 }
 
+int32 string_find(const char* str, char c)
+{
+	const char* iter = str;
+	while (*iter)
+	{
+		if (*iter == c)
+		{
+			return (int32)(iter - str);
+		}
+		++iter;
+	}
+
+	return -1;
+}
+
 int32 string_find_last(const char* str, char c)
 {
 	return string_find_last(str, c, string_length(str) - 1);
