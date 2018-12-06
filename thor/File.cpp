@@ -104,7 +104,7 @@ void dir_create(const char* path)
 	assert(success || GetLastError() == ERROR_ALREADY_EXISTS);
 }
 
-void file_search(const char* dir_path, const char* search_term, On_File_Found_Function on_file_found, void* state)
+void file_search(const char* dir_path, const char* search_term, bool32 include_subdirs, On_File_Found_Function on_file_found, void* state)
 {
 	char search_path[MAX_PATH + 1];
 	uint32 search_path_length = string_concat(search_path, sizeof(search_path), dir_path, "/");
@@ -126,27 +126,30 @@ void file_search(const char* dir_path, const char* search_term, On_File_Found_Fu
 		FindClose(find_handle);
 	}
 
-	// now search for directories
-	string_concat(search_path, sizeof(search_path), dir_path, "/*");
-	find_handle = FindFirstFileA(search_path, &find_data);
-	if (find_handle != INVALID_HANDLE_VALUE)
+	if (include_subdirs)
 	{
-		do
+		// now search for directories
+		string_concat(search_path, sizeof(search_path), dir_path, "/*");
+		find_handle = FindFirstFileA(search_path, &find_data);
+		if (find_handle != INVALID_HANDLE_VALUE)
 		{
-			int is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
-			if (is_directory)
+			do
 			{
-				if (!string_equals(find_data.cFileName, ".") && !string_equals(find_data.cFileName, ".."))
+				int is_directory = find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY;
+				if (is_directory)
 				{
-					char sub_dir_path[MAX_PATH + 1];
-					uint32 sub_dir_path_length = string_concat(sub_dir_path, sizeof(sub_dir_path), dir_path, "/");
-					sub_dir_path_length += string_copy(&sub_dir_path[sub_dir_path_length], sizeof(sub_dir_path) - sub_dir_path_length, find_data.cFileName);
+					if (!string_equals(find_data.cFileName, ".") && !string_equals(find_data.cFileName, ".."))
+					{
+						char sub_dir_path[MAX_PATH + 1];
+						uint32 sub_dir_path_length = string_concat(sub_dir_path, sizeof(sub_dir_path), dir_path, "/");
+						sub_dir_path_length += string_copy(&sub_dir_path[sub_dir_path_length], sizeof(sub_dir_path) - sub_dir_path_length, find_data.cFileName);
 
-					file_search(sub_dir_path, search_term, on_file_found, state);
+						file_search(sub_dir_path, search_term, include_subdirs, on_file_found, state);
+					}
 				}
-			}
-		} while (FindNextFileA(find_handle, &find_data));
+			} while (FindNextFileA(find_handle, &find_data));
 
-		FindClose(find_handle);
+			FindClose(find_handle);
+		}
 	}
 }

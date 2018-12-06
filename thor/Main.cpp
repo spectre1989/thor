@@ -118,6 +118,12 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 	if (string_length(cmd_line))
 	{
+		char defnames_file_path[256];
+		string_concat(defnames_file_path, sizeof(defnames_file_path), cmd_line, "\\bin\\defnames.bin");
+		File_Handle defnames_file = file_open_read(defnames_file_path);
+		defnames_file_read(defnames_file);
+		file_close(defnames_file);
+
 		const char* coh_data_path = cmd_line;
 		char geobin_file_path[256];
 		string_concat(geobin_file_path, sizeof(geobin_file_path), coh_data_path, "\\geobin\\maps\\City_Zones\\City_01_01\\City_01_01.bin");

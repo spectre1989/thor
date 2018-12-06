@@ -24,4 +24,4 @@ uint32 file_get_position(File_Handle file);
 void file_set_position(File_Handle file, uint32 position);
 void file_write_bytes(File_Handle file, uint32 byte_count, void* bytes);
 void dir_create(const char* path);
-void file_search(const char* dir_path, const char* search_term, On_File_Found_Function on_file_found, void* state);
+void file_search(const char* dir_path, const char* search_term, bool32 include_subdirs, On_File_Found_Function on_file_found, void* state);

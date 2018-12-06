@@ -327,7 +327,7 @@ void bin_file_check_bounds(File_Handle file)
 	}
 }
 
-void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst)
+void bin_file_read_string(File_Handle file, uint32 dst_size, char* dst) // todo(jbr) put dst then dst_size
 {
 	uint16 string_length = file_read_u16(file);
 	assert(string_length < dst_size);
@@ -526,14 +526,14 @@ struct Geobin
 	Geobin* next;
 };
 
-static void geobin_file_read_single(File_Handle file, const char* relative_path, Linear_Allocator* allocator, Geobin* out_geobin)
+static void bin_file_read_header(File_Handle file, uint32 expected_type_id)
 {
 	uint8 sig[8];
 	file_read(file, 8, sig);
 	assert(bytes_equal(sig, c_bin_file_sig, 8));
 
 	uint32 bin_type_id = file_read_u32(file);
-	assert(bin_type_id == c_bin_geobin_type_id);
+	assert(bin_type_id == expected_type_id);
 
 	{
 		char buffer[8];
@@ -546,7 +546,13 @@ static void geobin_file_read_single(File_Handle file, const char* relative_path,
 	uint32 files_section_size = file_read_u32(file);
 	file_skip(file, files_section_size);
 
-	file_skip(file, 4); // uint32 data_size
+	file_skip(file, 4); // data size
+}
+
+static void geobin_file_read_single(File_Handle file, const char* relative_path, Linear_Allocator* allocator, Geobin* out_geobin)
+{
+	bin_file_read_header(file, c_bin_geobin_type_id);
+
 	file_skip(file, 4); // int32 version
 
 	bin_file_skip_string(file); // scene file
@@ -736,7 +742,7 @@ static Def* find_def(Geobin* geobin, const char* def_name)
 	return nullptr;
 }
 
-static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_position, Quat def_rotation, Geobin* geobins)
+static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_position, Quat def_rotation, Geobin* geobins, const char* geobin_base_path, Linear_Allocator* allocator)
 {
 	Group* group_end = &def->groups[def->group_count];
 	for (Group* group = def->groups; group != group_end; ++group)
@@ -750,7 +756,7 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 			Def* referenced_def = find_def(geobin, group->name);
 			assert(referenced_def);
 
-			recursively_find_models(geobin, referenced_def, world_position, world_rotation, geobins);
+			recursively_find_models(geobin, referenced_def, world_position, world_rotation, geobins, geobin_base_path, allocator);
 		}
 		else
 		{
@@ -783,7 +789,7 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 				File_Search_State file_search_state = {};
 				file_search_state.buffer = found_file_path;
 				file_search_state.size = sizeof(found_file_path);
-				file_search(file_search_path, "*.bin", OnFileFound, &file_search_state);
+				file_search(file_search_path, "*.bin", /*include_subdirs*/ false, OnFileFound, &file_search_state);
 
 				if (found_file_path[0])
 				{
@@ -809,7 +815,7 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 
 			if (referenced_def)
 			{
-				recursively_find_models(referenced_geobin, referenced_def, world_position, world_rotation, geobins);
+				recursively_find_models(referenced_geobin, referenced_def, world_position, world_rotation, geobins, geobin_base_path, allocator);
 			}
 			else
 			{
@@ -833,7 +839,7 @@ void geobin_file_read(File_Handle file, const char* relative_path, const char* g
 		Def* def = find_def(root_geobin, ref->name);
 		assert(def);
 
-		recursively_find_models(root_geobin, def, ref->position, ref->rotation);
+		recursively_find_models(root_geobin, def, ref->position, ref->rotation, root_geobin, geobin_base_path, temp_allocator);
 	}
 
 	Geobin* geobin = root_geobin;
@@ -938,4 +944,51 @@ void geobin_file_read(File_Handle file, const char* relative_path, const char* g
 
 		geo = geo->next;
 	}*/
+}
+
+void defnames_file_read(File_Handle file)
+{
+	bin_file_read_header(file, c_bin_defnames_type_id);
+
+	File_Handle out = file_open_write("defnames.txt");
+
+	int32 defname_count = file_read_i32(file);
+	for (int32 i = 0; i < defname_count; ++i)
+	{
+		uint32 size = file_read_u32(file);
+		uint32 start = file_get_position(file);
+
+		char name[256];
+		bin_file_read_string(file, sizeof(name), name);
+
+		char buffer[512];
+		int count = snprintf(buffer, sizeof(buffer), "%d:%s\n", i, name);
+		file_write_bytes(out, count, buffer);
+
+		assert((file_get_position(file) - start) == size);
+	}
+
+	int32 count = file_read_i32(file);
+	for (int32 i = 0; i < count; ++i)
+	{
+		uint32 size = file_read_u32(file);
+		uint32 start = file_get_position(file);
+
+		char name[256];
+		bin_file_read_string(file, sizeof(name), name);
+		uint16 index = file_read_u16(file);
+		uint16 is_geo = file_read_u16(file);
+		assert(is_geo <= 1);
+
+		char buffer[512];
+		const char* type_string = is_geo ? "geo" : "geobin";
+		int chars_written = snprintf(buffer, sizeof(buffer), "%s:%hu:%s\n", type_string, index, name);
+		file_write_bytes(out, chars_written, buffer);
+
+		assert((file_get_position(file) - start) == size);
+	}
+
+	uint32 end = file_get_position(file);end;
+
+	file_close(out);
 }
