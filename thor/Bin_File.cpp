@@ -347,19 +347,24 @@ static char* bin_file_read_string(File_Handle file, Linear_Allocator* allocator)
 {
 	uint16 string_length = file_read_u16(file);
 	
-	char* str = (char*)linear_allocator_alloc(allocator, string_length + 1);
-
-	file_read(file, string_length, str);
-	str[string_length] = 0;
-
-	// note: bin files need 4 byte aligned reads
-	uint32 bytes_misaligned = (string_length + 2) & 3; // & 3 is equivalent to % 4
-	if (bytes_misaligned)
+	if (string_length)
 	{
-		file_skip(file, 4 - bytes_misaligned);
+		char* str = (char*)linear_allocator_alloc(allocator, string_length + 1);
+
+		file_read(file, string_length, str);
+		str[string_length] = 0;
+
+		// note: bin files need 4 byte aligned reads
+		uint32 bytes_misaligned = (string_length + 2) & 3; // & 3 is equivalent to % 4
+		if (bytes_misaligned)
+		{
+			file_skip(file, 4 - bytes_misaligned);
+		}
+
+		return str;
 	}
 
-	return str;
+	return nullptr;
 }
 
 static void bin_file_skip_string(File_Handle file)
@@ -396,6 +401,7 @@ struct Group
 struct Def
 {
 	const char* name;
+	const char* obj;
 	Group* groups;
 	int32 group_count;
 };
@@ -559,7 +565,7 @@ static void geobin_file_read_single(File_Handle file, const char* relative_path,
 	bin_file_skip_string(file); // loading screen
 
 	int32 def_count = file_read_i32(file);
-	Def* defs = (Def*)linear_allocator_alloc(allocator, sizeof(Def) * def_count);
+	Def* defs = def_count ? (Def*)linear_allocator_alloc(allocator, sizeof(Def) * def_count) : nullptr;
 	for (int32 def_i = 0; def_i < def_count; ++def_i)
 	{
 		Def* def = &defs[def_i];
@@ -589,97 +595,22 @@ static void geobin_file_read_single(File_Handle file, const char* relative_path,
 			file_skip(file, 4); // flags
 		}
 
-		/*
-		int32 property_count = file_read_i32(file);
-		for (int32 property_i = 0; property_i < property_count; ++property_i)
+		// 11 sections here we don't (yet) care about
+		for (int32 skip_i = 0; skip_i < 11; ++skip_i)
 		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 tint_color_count = file_read_i32(file);
-		for (int32 tint_color_i = 0; tint_color_i < tint_color_count; ++tint_color_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 ambient_count = file_read_i32(file);
-		for (int32 ambient_i = 0; ambient_i < ambient_count; ++ambient_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 omni_count = file_read_i32(file);
-		for (int32 omni_i = 0; omni_i < omni_count; ++omni_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 cubemap_count = file_read_i32(file);
-		for (int32 cubemap_i = 0; cubemap_i < cubemap_count; ++cubemap_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 volume_count = file_read_i32(file);
-		for (int32 volume_i = 0; volume_i < volume_count; ++volume_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 sound_count = file_read_i32(file);
-		for (int32 sound_i = 0; sound_i < sound_count; ++sound_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 replace_tex_count = file_read_i32(file);
-		for (int32 replace_tex_i = 0; replace_tex_i < replace_tex_count; ++replace_tex_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 beacon_count = file_read_i32(file);
-		for (int32 beacon_i = 0; beacon_i < beacon_count; ++beacon_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 fog_count = file_read_i32(file);
-		for (int32 fog_i = 0; fog_i < fog_count; ++fog_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		int32 lod_count = file_read_i32(file);
-		for (int32 lod_i = 0; lod_i < lod_count; ++lod_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
+			int32 count = file_read_i32(file);
+			for (int32 i = 0; i < count; ++i)
+			{
+				uint32 size = file_read_u32(file);
+				file_skip(file, size);
+			}
 		}
 
 		bin_file_skip_string(file); // "Type"
 		file_skip(file, 4); // uint32 flags
 		file_skip(file, 4); // float32 alpha
-		bin_file_skip_string(file); // "Obj"
 
-		int32 tex_swap_count = file_read_i32(file);
-		for (int32 tex_swap_i = 0; tex_swap_i < tex_swap_count; ++tex_swap_i)
-		{
-			uint32 size = file_read_u32(file);
-			file_skip(file, size);
-		}
-
-		bin_file_skip_string(file); // "SoundScript" */
+		def->obj = bin_file_read_string(file, allocator);
 
 		file_set_position(file, def_start + def_size);
 	}
