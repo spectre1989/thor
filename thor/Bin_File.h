@@ -18,6 +18,4 @@ constexpr uint32 c_bin_defnames_type_id = 0x0c027625;
  */
 void bin_file_check(File_Handle file);
 
-void geobin_file_read(File_Handle file, const char* relative_path, const char* geobin_base_path, const char* geo_base_path, Matrix_4x4* object_matrices, int32 num_object_matrices, int32* out_num_objects_in_scene, struct Linear_Allocator* temp_allocator);
-
-void defnames_file_read(File_Handle file);
+void geobin_file_read(File_Handle file, const char* relative_path, const char* coh_data_path, struct Linear_Allocator* temp_allocator);
