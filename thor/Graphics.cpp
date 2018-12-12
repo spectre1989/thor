@@ -110,7 +110,7 @@ static void create_buffer(VkDevice device,
 	*out_buffer_memory = buffer_memory;
 }
 
-static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, int32 vertex_offset, uint16* indicies, int32 index_offset)
+static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, int32 vertex_offset, uint16* indices, int32 index_offset)
 {
 	Vec_3f half_size = vec_3f_mul(vec_3f_add(right, up), 0.5f);
 
@@ -134,12 +134,12 @@ static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, in
 	vertices[vertex_i++] = bottom_right.y;
 	vertices[vertex_i++] = bottom_right.z;
 
-	indicies[index_offset++] = uint16(vertex_offset);
-	indicies[index_offset++] = uint16(vertex_offset + 2);
-	indicies[index_offset++] = uint16(vertex_offset + 1);
-	indicies[index_offset++] = uint16(vertex_offset);
-	indicies[index_offset++] = uint16(vertex_offset + 3);
-	indicies[index_offset++] = uint16(vertex_offset + 2);
+	indices[index_offset++] = uint16(vertex_offset);
+	indices[index_offset++] = uint16(vertex_offset + 2);
+	indices[index_offset++] = uint16(vertex_offset + 1);
+	indices[index_offset++] = uint16(vertex_offset);
+	indices[index_offset++] = uint16(vertex_offset + 3);
+	indices[index_offset++] = uint16(vertex_offset + 2);
 }
 
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, int32 num_objects_in_scene, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
@@ -665,7 +665,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	constexpr int32 c_ibo_size = c_index_count * sizeof(uint16);
 	
 	float32 vertices[c_vertex_float32_count];
-	uint16 indicies[c_index_count];
+	uint16 indices[c_index_count];
 
 	int32 vertex_offset = 0;
 	int32 index_offset = 0;
@@ -673,7 +673,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	create_quad(vec_3f(0.0f, -0.5f, 0.0f), // pos
 				vec_3f(1.0f, 0.0f, 0.0f),  // right
 				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indicies, index_offset);
+				vertices, vertex_offset, indices, index_offset);
 	vertex_offset += 4;
 	index_offset += 6;
 
@@ -681,7 +681,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	create_quad(vec_3f(0.0f, 0.5f, 0.0f), // pos
 				vec_3f(-1.0f, 0.0f, 0.0f),  // right
 				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indicies, index_offset);
+				vertices, vertex_offset, indices, index_offset);
 	vertex_offset += 4;
 	index_offset += 6;
 
@@ -689,7 +689,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	create_quad(vec_3f(-0.5f, 0.0f, 0.0f), // pos
 				vec_3f(0.0f, -1.0f, 0.0f),  // right
 				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indicies, index_offset);
+				vertices, vertex_offset, indices, index_offset);
 	vertex_offset += 4;
 	index_offset += 6;
 
@@ -697,7 +697,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	create_quad(vec_3f(0.5f, 0.0f, 0.0f), // pos
 				vec_3f(0.0f, 1.0f, 0.0f),  // right
 				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indicies, index_offset);
+				vertices, vertex_offset, indices, index_offset);
 	vertex_offset += 4;
 	index_offset += 6;
 
@@ -705,7 +705,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	create_quad(vec_3f(0.0f, 0.0f, 0.5f), // pos
 				vec_3f(1.0f, 0.0f, 0.0f),  // right
 				vec_3f(0.0f, 1.0f, 0.0f),  // up
-				vertices, vertex_offset, indicies, index_offset);
+				vertices, vertex_offset, indices, index_offset);
 	vertex_offset += 4;
 	index_offset += 6;
 
@@ -713,7 +713,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	create_quad(vec_3f(0.0f, 0.0f, -0.5f), // pos
 				vec_3f(1.0f, 0.0f, 0.0f),  // right
 				vec_3f(0.0f, -1.0f, 0.0f),  // up
-				vertices, vertex_offset, indicies, index_offset);
+				vertices, vertex_offset, indices, index_offset);
 	vertex_offset += 4;
 	index_offset += 6;
 
@@ -746,7 +746,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	uint16* ibo_data;
 	result = vkMapMemory(graphics_state->device, index_buffer_memory, /*offset*/ 0, c_ibo_size, /*flags*/ 0, (void**)&ibo_data);
 	assert(result == VK_SUCCESS);
-	memcpy(ibo_data, indicies, c_ibo_size);
+	memcpy(ibo_data, indices, c_ibo_size);
 	vkUnmapMemory(graphics_state->device, index_buffer_memory);
 
 	constexpr uint32 c_num_shader_stages = 2;
