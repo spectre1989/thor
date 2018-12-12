@@ -778,4 +778,45 @@ void geobin_file_read(File_Handle file, const char* relative_path, const char* c
 
 		recursively_find_models(root_geobin, def, ref->position, ref->rotation, defnames, root_geobin, &geos, geobin_base_path, temp_allocator);
 	}
+
+	char geo_base_path[256];
+	string_concat(geo_base_path, sizeof(geo_base_path), coh_data_path, "/");
+
+	// create a temp sub-allocator, so it can be reset for the parsing of each geo file
+	Linear_Allocator geo_temp_allocator;
+	linear_allocator_create_sub_allocator(temp_allocator, &geo_temp_allocator);
+
+	Geo* geo = geos;
+	while (geo)
+	{
+		linear_allocator_reset(&geo_temp_allocator);
+
+		Model* model = geo->models;
+		int32 model_count = 0;
+		while (model)
+		{
+			++model_count;
+			model = model->next;
+		}
+
+		const char** model_names = (const char**)linear_allocator_alloc(&geo_temp_allocator, sizeof(const char*) * model_count);
+		model = geo->models;
+		int32 model_i = 0;
+		while (model)
+		{
+			model_names[model_i++] = model->name;
+			model = model->next;
+		}
+
+		char geo_file_path[256];
+		string_concat(geo_file_path, sizeof(geo_file_path), geo_base_path, geo->relative_path);
+
+		File_Handle geo_file = file_open_read(geo_file_path);
+
+		geo_file_read(geo_file, model_names, model_count, temp_allocator);
+
+		file_close(geo_file);
+
+		geo = geo->next;
+	}
 }

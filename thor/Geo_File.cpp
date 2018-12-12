@@ -431,13 +431,12 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	}*/
 }
 
-void geo_file_read(File_Handle file, const char** model_names, int32 model_name_count, Linear_Allocator* allocator)
+void geo_file_read(File_Handle file, const char** model_names, int32 model_name_count, Linear_Allocator* temp_allocator)
 {
-	// todo(jbr)
-	bool32* found = (bool32*)linear_allocator_alloc(allocator, sizeof(bool32) * model_name_count);
+	int32* model_indices = (int32*)linear_allocator_alloc(temp_allocator, sizeof(int32) * model_name_count);
 	for (int32 i = 0; i < model_name_count; ++i)
 	{
-		found[i] = 0;
+		model_indices[i] = -1;
 	}
 
 	uint32 header_size = file_read_u32(file);
@@ -463,8 +462,8 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_name_
 		deflated_header_size = header_size - 4;
 	}
 
-	uint8* deflated_header_bytes = linear_allocator_alloc(allocator, deflated_header_size);
-	uint8* inflated_header_bytes = linear_allocator_alloc(allocator, inflated_header_size);
+	uint8* deflated_header_bytes = linear_allocator_alloc(temp_allocator, deflated_header_size);
+	uint8* inflated_header_bytes = linear_allocator_alloc(temp_allocator, inflated_header_size);
 
 	file_read(file, deflated_header_size, deflated_header_bytes);
 	uint32 file_end_of_header_pos = file_get_position(file); file_end_of_header_pos;
@@ -506,93 +505,56 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_name_
 	
 	uint32 model_count = buffer_read_u32(&header);
 
+	uint8* models_section = header;
+
+	uint8* model = models_section;
 	for (uint32 model_i = 0; model_i < model_count; ++model_i)
 	{
-		uint8* model = header;
-
-		const char* model_name;
-		uint32	model_vertex_count;
-		uint32	model_triangle_count;
-		uint32	deflated_triangle_data_size;
-		uint32	inflated_triangle_data_size;
-		uint32	triangle_data_offset;
-		uint32	deflated_vertex_data_size;
-		uint32	inflated_vertex_data_size;
-		uint32	vertex_data_offset;
-		if (version <= 2) // 0, 2
-		{
-			model_vertex_count = *(uint32*)&model[28];
-			model_triangle_count = *(uint32*)&model[32];
-			model_name = (const char*)&model_names_section[*(uint32*)&model[80]];
-			deflated_triangle_data_size = *(uint32*)&model[132];
-			inflated_triangle_data_size = *(uint32*)&model[136];
-			triangle_data_offset = *(uint32*)&model[140];
-			deflated_vertex_data_size = *(uint32*)&model[144];
-			inflated_vertex_data_size = *(uint32*)&model[148];
-			vertex_data_offset = *(uint32*)&model[152];
-		}
-		else if (version <= 7) // 3, 4, 5, 7
-		{
-			model_vertex_count = *(uint32*)&model[16];
-			model_triangle_count = *(uint32*)&model[20];
-			model_name = (const char*)&model_names_section[*(uint32*)&model[60]];
-			deflated_triangle_data_size = *(uint32*)&model[104];
-			inflated_triangle_data_size = *(uint32*)&model[108];
-			triangle_data_offset = *(uint32*)&model[112];
-			deflated_vertex_data_size = *(uint32*)&model[116];
-			inflated_vertex_data_size = *(uint32*)&model[120];
-			vertex_data_offset = *(uint32*)&model[124];
-		}
-		else // 8
-		{
-			model_vertex_count = *(uint32*)&model[16];
-			model_triangle_count = *(uint32*)&model[20];
-			model_name = (const char*)&model_names_section[*(uint32*)&model[64]];
-			deflated_triangle_data_size = *(uint32*)&model[108];
-			inflated_triangle_data_size = *(uint32*)&model[112];
-			triangle_data_offset = *(uint32*)&model[116];
-			deflated_vertex_data_size = *(uint32*)&model[120];
-			inflated_vertex_data_size = *(uint32*)&model[124];
-			vertex_data_offset = *(uint32*)&model[128];
-		}
-
-		for (int32 model_name_i = 0; model_name_i < model_name_count; ++model_name_i)
-		{
-			if (string_contains(model_name, model_names[model_name_i]))
-			{
-				found[model_name_i] = 1;
-			}
-		}
+		const char* model_name = nullptr; // todo(jbr) remember to document the model names section and model name offset
 
 		switch (version)
 		{
 		case 0:
 		case 2:
-			header += 216;
+			model_name = (const char*)&model_names_section[*(uint32*)&model[80]];
+			model += 216;
 			break;
 
 		case 3:
 		case 5:
-			header += 208;
+			model_name = (const char*)&model_names_section[*(uint32*)&model[60]];
+			model += 208;
 			break;
 
 		case 4:
 		case 7:
-			header += 232;
+			model_name = (const char*)&model_names_section[*(uint32*)&model[60]];
+			model += 232;
 			break;
 
 		case 8:
-			header += 244;
+			model_name = (const char*)&model_names_section[*(uint32*)&model[64]];
+			model += 244;
 			break;
 
 		default:
 			assert(false);
 			break;
 		}
+
+		for (int32 model_name_i = 0; model_name_i < model_name_count; ++model_name_i)
+		{
+			if (string_starts_with(model_name, model_names[model_name_i]))
+			{
+				model_indices[model_name_i] = model_i;
+			}
+		}
 	}
 
 	for (int32 i = 0; i < model_name_count; ++i)
 	{
-		assert(found[i]);
+		assert(model_indices[i] > -1);
+
+
 	}
 }
