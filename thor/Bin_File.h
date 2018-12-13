@@ -18,4 +18,4 @@ constexpr uint32 c_bin_defnames_type_id = 0x0c027625;
  */
 void bin_file_check(File_Handle file);
 
-void geobin_file_read(File_Handle file, const char* relative_path, const char* coh_data_path, struct Linear_Allocator* temp_allocator);
+void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, struct Linear_Allocator* temp_allocator);
