@@ -546,6 +546,45 @@ static void geobin_file_read_single(File_Handle file, Geobin* out_geobin, const 
 	out_geobin->ref_count = ref_count;
 }
 
+/*static uint32 crc_32(uint32 generator, uint8* input, int32 input_size)
+{
+	uint32 crc = 0;
+
+	uint8* input_end = &input[input_size];
+	for (; input != input_end; ++input)
+	{
+		crc ^= (*input << 24);
+
+		for (int32 j = 0; j < 8; ++j)
+		{
+			if (crc & (1 << 31))
+			{
+				crc = (crc << 1) ^ generator;
+			}
+			else
+			{
+				crc <<= 1;
+			}
+		}
+	}
+
+	return crc;
+}
+
+static uint32 crc_32_table(uint32* table, uint8* input, int32 input_size)
+{
+	uint32 crc = 0xffffffff;
+
+	uint8* input_end = &input[input_size];
+	for (; input != input_end; ++input)
+	{
+		crc ^= (*input << 24);
+		crc = (crc << 8) ^ table[crc >> 24];
+	}
+
+	return crc ^ 0xffffffff;
+}*/
+
 static Def* find_def(Geobin* geobin, const char* def_name)
 {
 	Def* def_end = &geobin->defs[geobin->def_count];
