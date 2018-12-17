@@ -17,4 +17,5 @@ int32 string_copy(char* dst, int32 dst_size, const char* src);
 int32 string_copy(char* dst, int32 dst_size, const char* src, int32 count);
 char* string_copy(const char* src, struct Linear_Allocator* allocator);
 int32 string_concat(char* dst, int32 dst_size, const char* s1, const char* s2);
+char char_to_lower(char c);
 void string_to_lower(char* str);

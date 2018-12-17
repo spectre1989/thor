@@ -391,6 +391,149 @@ static void bin_file_skip_string(File_Handle file)
 	return (r << 16) | (g << 8) | b;
 }*/
 
+constexpr uint32 c_crc_32_generator = 0x04C11DB7;
+constexpr uint32 c_crc_32_init = 0xffffffff;
+constexpr uint32 c_crc_32_xor_out = 0xffffffff;
+static uint32 crc_32_slow(uint8* input, int32 input_size)
+{
+	uint32 crc = 0;
+
+	uint8* input_end = &input[input_size];
+	for (; input != input_end; ++input)
+	{
+		crc ^= (*input << 24);
+
+		for (int32 j = 0; j < 8; ++j)
+		{
+			if (crc & (1 << 31))
+			{
+				crc = (crc << 1) ^ c_crc_32_generator;
+			}
+			else
+			{
+				crc <<= 1;
+			}
+		}
+	}
+
+	return crc;
+}
+
+static uint32* crc_32_create_table()
+{
+	static uint32 table[256];
+
+	for (int32 i = 0; i < 256; ++i)
+	{
+		uint8 input = (uint8)i;
+		table[i] = crc_32_slow(&input, 1);
+	}
+
+	return table;
+}
+static uint32* s_crc_32_table = crc_32_create_table();
+
+/*static uint32 crc_32(uint8* input, int32 input_size)
+{
+	uint32 crc = c_crc_32_init;
+
+	uint8* input_end = &input[input_size];
+	for (; input != input_end; ++input)
+	{
+		crc ^= (*input << 24);
+		crc = (crc << 8) ^ s_crc_32_table[crc >> 24];
+	}
+
+	return crc ^ c_crc_32_xor_out;
+}*/
+
+static uint32 crc_32_ignore_case(uint8* input, int32 input_size)
+{
+	uint32 crc = c_crc_32_init;
+
+	uint8* input_end = &input[input_size];
+	for (; input != input_end; ++input)
+	{
+		crc ^= (char_to_lower(*input) << 24);
+		crc = (crc << 8) ^ s_crc_32_table[crc >> 24];
+	}
+
+	return crc ^ c_crc_32_xor_out;
+}
+
+struct Map
+{
+	struct Node
+	{
+		const char* key;
+		void* value;
+		Node* next;
+	};
+
+	Node* node_pool;
+	int32 node_pool_size;
+	Node* next_available_node;
+	Node* map;
+	int32 map_size;
+	int32 map_mask;
+};
+
+static void map_create(Map* map, int32 max_items, Linear_Allocator* allocator)
+{
+	map->node_pool = (Map::Node*)linear_allocator_alloc(allocator, sizeof(Map::Node) * max_items);
+	map->node_pool_size = max_items;
+	map->next_available_node = map->node_pool;
+	map->map_size = u32_next_power_of_two(max_items);
+	map->map_mask = map->map_size - 1;
+	map->map = (Map::Node*)linear_allocator_alloc(allocator, sizeof(Map::Node) * map->map_size);
+	for (int32 i = 0; i < map->map_size; ++i)
+	{
+		map->map[i] = {};
+	}
+}
+
+static void map_add(Map* map, const char* key, void* value)
+{
+	uint32 hash = crc_32_ignore_case((uint8*)key, string_length(key));
+
+	assert(map->next_available_node != (map->node_pool + map->node_pool_size));
+
+	Map::Node* node = &map->map[hash & map->map_mask];
+	if (!node->key)
+	{
+		node->key = key;
+		node->value = value;
+	}
+	else
+	{
+		Map::Node* new_node = map->next_available_node++;
+		new_node->key = node->key;
+		new_node->value = node->value;
+		new_node->next = node->next;
+		node->key = key;
+		node->value = value;
+		node->next = new_node;
+	}
+}
+
+static void* map_find(Map* map, const char* key)
+{
+	uint32 hash = crc_32_ignore_case((uint8*)key, string_length(key));
+	Map::Node* node = &map->map[hash & map->map_mask];
+
+	while (node)
+	{
+		if (string_equals_ignore_case(node->key, key))
+		{
+			return node->value;
+		}
+
+		node = node->next;
+	}
+
+	return nullptr;
+}
+
 struct Group
 {
 	const char* name;
@@ -432,6 +575,7 @@ struct Geobin
 	const char* relative_file_path;
 	Def* defs;
 	int32 def_count;
+	Map def_map;
 	Group* refs;
 	int32 ref_count;
 	Geobin* next;
@@ -546,78 +690,33 @@ static void geobin_file_read_single(File_Handle file, Geobin* out_geobin, const 
 	out_geobin->ref_count = ref_count;
 }
 
-/*static uint32 crc_32(uint32 generator, uint8* input, int32 input_size)
-{
-	uint32 crc = 0;
-
-	uint8* input_end = &input[input_size];
-	for (; input != input_end; ++input)
-	{
-		crc ^= (*input << 24);
-
-		for (int32 j = 0; j < 8; ++j)
-		{
-			if (crc & (1 << 31))
-			{
-				crc = (crc << 1) ^ generator;
-			}
-			else
-			{
-				crc <<= 1;
-			}
-		}
-	}
-
-	return crc;
-}
-
-static uint32 crc_32_table(uint32* table, uint8* input, int32 input_size)
-{
-	uint32 crc = 0xffffffff;
-
-	uint8* input_end = &input[input_size];
-	for (; input != input_end; ++input)
-	{
-		crc ^= (*input << 24);
-		crc = (crc << 8) ^ table[crc >> 24];
-	}
-
-	return crc ^ 0xffffffff;
-}*/
-
-static Def* find_def(Geobin* geobin, const char* def_name)
-{
-	Def* def_end = &geobin->defs[geobin->def_count];
-	for (Def* def = geobin->defs; def != def_end; ++def)
-	{
-		if (string_equals_ignore_case(def->name, def_name))
-		{
-			return def;
-		}
-	}
-
-	return nullptr;
-}
-
-struct Defnames_Row
-{
-	const char* defname;
-	const char* relative_file_path;
-	bool32 is_geo;
-};
-
 struct Defnames
 {
+	struct Row
+	{
+		const char* defname;
+		const char* relative_file_path;
+		bool32 is_geo;
+	};
+
+	struct Map_Node
+	{
+		Row* row;
+		Map_Node* next;
+	};
+
 	const char** relative_file_paths;
 	int32 relative_file_path_count;
-	Defnames_Row* rows;
+	Row* rows;
 	int32 row_count;
+	Map row_map;
 };
 
 static void defnames_file_read(File_Handle file, Defnames* out_defnames, Linear_Allocator* allocator)
 {
 	bin_file_read_header(file, c_bin_defnames_type_id);
 
+	*out_defnames = {};
 	out_defnames->relative_file_path_count = file_read_i32(file);
 	out_defnames->relative_file_paths = (const char**)linear_allocator_alloc(allocator, sizeof(const char*) * out_defnames->relative_file_path_count);
 	const char** relative_file_path_end = &out_defnames->relative_file_paths[out_defnames->relative_file_path_count];
@@ -629,9 +728,11 @@ static void defnames_file_read(File_Handle file, Defnames* out_defnames, Linear_
 	}
 
 	out_defnames->row_count = file_read_i32(file);
-	out_defnames->rows = (Defnames_Row*)linear_allocator_alloc(allocator, sizeof(Defnames_Row) * out_defnames->row_count);
-	Defnames_Row* row_end = &out_defnames->rows[out_defnames->row_count];
-	for (Defnames_Row* row = out_defnames->rows; row != row_end; ++row)
+	out_defnames->rows = (Defnames::Row*)linear_allocator_alloc(allocator, sizeof(Defnames::Row) * out_defnames->row_count);
+	map_create(&out_defnames->row_map, /*max_items*/ out_defnames->row_count, allocator);
+
+	Defnames::Row* row_end = &out_defnames->rows[out_defnames->row_count];
+	for (Defnames::Row* row = out_defnames->rows; row != row_end; ++row)
 	{
 		file_skip(file, 4); // size
 
@@ -641,21 +742,9 @@ static void defnames_file_read(File_Handle file, Defnames* out_defnames, Linear_
 		row->relative_file_path = out_defnames->relative_file_paths[index];
 
 		row->is_geo = file_read_u16(file);
+		
+		map_add(&out_defnames->row_map, row->defname, row);
 	}
-}
-
-static Defnames_Row* defnames_find(Defnames* defnames, const char* row_name)
-{
-	Defnames_Row* row_end = &defnames->rows[defnames->row_count];
-	for (Defnames_Row* row = defnames->rows; row != row_end; ++row)
-	{
-		if (string_equals_ignore_case(row_name, row->defname))
-		{
-			return row;
-		}
-	}
-
-	return nullptr;
 }
 
 static void add_model_instance(const char* relative_geo_file_path, const char* model_name, Vec_3f position, Quat rotation, Geo** geos, Linear_Allocator* allocator)
@@ -721,7 +810,7 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 		char def_name[64];
 		string_copy(def_name, sizeof(def_name), &def->obj[last_slash + 1]);
 
-		Defnames_Row* defnames_row = defnames_find(defnames, def_name);
+		Defnames::Row* defnames_row = (Defnames::Row*)map_find(&defnames->row_map, def_name);
 		assert(defnames_row && defnames_row->is_geo);
 
 		add_model_instance(defnames_row->relative_file_path, defnames_row->defname, def_position, def_rotation, geos, allocator);
@@ -747,61 +836,68 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 			def_name = group->name;
 		}
 
-		Defnames_Row* defnames_row = defnames_find(defnames, def_name);
-
-		if (defnames_row)
+		if (last_slash_in_name < 0)
 		{
-			if (defnames_row->is_geo)
+			// for defnames which are not paths, first try this geobin
+			Def* referenced_def = (Def*)map_find(&geobin->def_map, def_name);
+			if (referenced_def)
 			{
-				add_model_instance(defnames_row->relative_file_path, defnames_row->defname, world_position, world_rotation, geos, allocator);
+				recursively_find_models(geobin, referenced_def, world_position, world_rotation, defnames, geobins, geos, geobin_base_path, allocator);
 			}
 			else
 			{
-				// for some reason, file paths in defnames all end in .geo
-				char relative_geobin_file_path[256];
-				int32 string_length = string_copy(relative_geobin_file_path, sizeof(relative_geobin_file_path), defnames_row->relative_file_path);
-				string_copy(&relative_geobin_file_path[string_length - 3], sizeof(relative_geobin_file_path) - (string_length - 3), "bin");
+				// if that doesn't work, look in defnames
+				Defnames::Row* defnames_row = (Defnames::Row*)map_find(&defnames->row_map, def_name);
+				assert(defnames_row);
 
-				Geobin* referenced_geobin = nullptr;
-				Geobin* geobin_iter = geobins;
-				while (geobin_iter)
+				if (defnames_row)
 				{
-					if (string_equals(geobin_iter->relative_file_path, relative_geobin_file_path))
+					if (defnames_row->is_geo)
 					{
-						referenced_geobin = geobin_iter;
-						break;
+						add_model_instance(defnames_row->relative_file_path, defnames_row->defname, world_position, world_rotation, geos, allocator);
 					}
-					geobin_iter = geobin_iter->next;
+					else
+					{
+						// for some reason, file paths in defnames all end in .geo
+						char relative_geobin_file_path[256];
+						int32 string_length = string_copy(relative_geobin_file_path, sizeof(relative_geobin_file_path), defnames_row->relative_file_path);
+						string_copy(&relative_geobin_file_path[string_length - 3], sizeof(relative_geobin_file_path) - (string_length - 3), "bin");
+
+						Geobin* referenced_geobin = nullptr;
+						Geobin* geobin_iter = geobins;
+						while (geobin_iter)
+						{
+							if (string_equals(geobin_iter->relative_file_path, relative_geobin_file_path))
+							{
+								referenced_geobin = geobin_iter;
+								break;
+							}
+							geobin_iter = geobin_iter->next;
+						}
+
+						if (!referenced_geobin)
+						{
+							char referenced_geobin_file_path[256];
+							string_concat(referenced_geobin_file_path, sizeof(referenced_geobin_file_path), geobin_base_path, relative_geobin_file_path);
+
+							File_Handle referenced_geobin_file = file_open_read(referenced_geobin_file_path);
+
+							referenced_geobin = (Geobin*)linear_allocator_alloc(allocator, sizeof(Geobin));
+							geobin_file_read_single(referenced_geobin_file, referenced_geobin, relative_geobin_file_path, allocator);
+
+							referenced_geobin->next = geobins->next;
+							geobins->next = referenced_geobin;
+						}
+
+						assert(referenced_geobin);
+
+						referenced_def = (Def*)map_find(&referenced_geobin->def_map, def_name);
+						assert(referenced_def);
+
+						recursively_find_models(referenced_geobin, referenced_def, world_position, world_rotation, defnames, geobins, geos, geobin_base_path, allocator);
+					}
 				}
-
-				if (!referenced_geobin)
-				{
-					char referenced_geobin_file_path[256];
-					string_concat(referenced_geobin_file_path, sizeof(referenced_geobin_file_path), geobin_base_path, relative_geobin_file_path);
-
-					File_Handle referenced_geobin_file = file_open_read(referenced_geobin_file_path);
-
-					referenced_geobin = (Geobin*)linear_allocator_alloc(allocator, sizeof(Geobin));
-					geobin_file_read_single(referenced_geobin_file, referenced_geobin, relative_geobin_file_path, allocator);
-
-					referenced_geobin->next = geobins->next;
-					geobins->next = referenced_geobin;
-				}
-
-				assert(referenced_geobin);
-
-				Def* referenced_def = find_def(referenced_geobin, def_name);
-				assert(referenced_def);
-
-				recursively_find_models(referenced_geobin, referenced_def, world_position, world_rotation, defnames, geobins, geos, geobin_base_path, allocator);
 			}
-		}
-		else
-		{
-			Def* referenced_def = find_def(geobin, def_name);
-			assert(referenced_def);
-
-			recursively_find_models(geobin, referenced_def, world_position, world_rotation, defnames, geobins, geos, geobin_base_path, allocator);
 		}
 	}
 }
@@ -829,7 +925,7 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 		// assuming no refs are actually referencing external geobins right?
 		assert(string_find(ref->name, '/') == -1 && string_find(ref->name, '\\'));
 
-		Def* def = find_def(root_geobin, ref->name);
+		Def* def = (Def*)map_find(&root_geobin->def_map, ref->name);
 		assert(def);
 
 		recursively_find_models(root_geobin, def, ref->position, ref->rotation, defnames, root_geobin, &geos, geobin_base_path, temp_allocator);
@@ -869,10 +965,12 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 
 		File_Handle geo_file = file_open_read(geo_file_path);
 
-		geo_file_read(geo_file, model_names, model_count, temp_allocator);
+		geo_file_read(geo_file, model_names, model_count, &geo_temp_allocator);
 
 		file_close(geo_file);
 
 		geo = geo->next;
 	}
+
+	int x = 1; ++x;
 }

@@ -32,24 +32,9 @@ bool string_equals(const char* a, const char* b)
 	return false;
 }
 
-static char char_to_lower(char c)
-{
-	if (c >= 'A' && c <= 'Z')
-	{
-		c += 'a' - 'A';
-	}
-
-	return c;
-}
-
-static bool char_equals_ignore_case(char a, char b)
-{
-	return char_to_lower(a) == char_to_lower(b);
-}
-
 bool string_equals_ignore_case(const char* a, const char* b)
 {
-	while (char_equals_ignore_case(*a, *b))
+	while (char_to_lower(*a) == char_to_lower(*b))
 	{
 		if (!*a)
 		{
@@ -81,7 +66,7 @@ bool string_starts_with(const char* str, const char* starts_with)
 
 bool string_starts_with_ignore_case(const char* str, const char* starts_with)
 {
-	while (*starts_with && char_equals_ignore_case(*str, *starts_with))
+	while (*starts_with && char_to_lower(*str) == char_to_lower(*starts_with))
 	{
 		++str;
 		++starts_with;
@@ -212,6 +197,30 @@ int32 string_concat(char* dst, int32 dst_size, const char* s1, const char* s2)
 	string_length += string_copy(&dst[string_length], dst_size - string_length, s2);
 
 	return string_length;
+}
+
+static char* create_char_to_lower_table()
+{
+	static char table[256];
+
+	for (int32 i = 0; i < 256; ++i)
+	{
+		table[i] = (char)i;
+	}
+
+	for (int32 i = 'A'; i <= 'Z'; ++i)
+	{
+		table[i] = (char)i + ('a' - 'A');
+	}
+
+	return table;
+}
+
+static char* s_char_to_lower_table = create_char_to_lower_table();
+
+__forceinline char char_to_lower(char c)
+{
+	return s_char_to_lower_table[c];
 }
 
 void string_to_lower(char* str)

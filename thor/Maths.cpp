@@ -10,6 +10,23 @@ int32 i32_min(int32 a, int32 b)
 }
 
 
+uint32 u32_next_power_of_two(uint32 u32)
+{
+	// copy highest 1 into all other bits, then add 1, doesn't work for 0
+	--u32;
+
+	u32 |= u32 >> 1;
+	u32 |= u32 >> 2;
+	u32 |= u32 >> 4;
+	u32 |= u32 >> 8;
+	u32 |= u32 >> 16;
+
+	++u32;
+
+	return u32;
+}
+
+
 float32 f32_clamp(float32 f, float32 min, float32 max)
 {
 	if (f >= min)
