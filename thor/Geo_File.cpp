@@ -36,12 +36,11 @@ static uint8 geo_read_delta_bits(uint8* buffer, uint32 bit_offset)
 	return (byte >> bit_offset_in_byte) & 3;
 }
 
-static uint32* geo_unpack_delta_compressed_triangles(File_Handle file, uint32 deflated_data_size, uint32 inflated_data_size, uint32 file_pos, uint32 triangle_count, Linear_Allocator* allocator)
+static uint32* geo_unpack_delta_compressed_triangles(File_Handle file, uint32 deflated_data_size, uint32 inflated_data_size, uint32 file_pos, uint32* triangles, uint32 triangle_count, Linear_Allocator* temp_allocator)
 {
 	if (inflated_data_size)
 	{
-		uint8* delta_compressed_data = geo_read_delta_compressed_data_from_file(file, deflated_data_size, inflated_data_size, file_pos, allocator);
-		uint32* triangles = (uint32*)linear_allocator_alloc(allocator, triangle_count * 3 * sizeof(uint32));
+		uint8* delta_compressed_data = geo_read_delta_compressed_data_from_file(file, deflated_data_size, inflated_data_size, file_pos, temp_allocator);
 
 		uint8* delta_bits_section = delta_compressed_data;
 		uint32 delta_bits_count = triangle_count * 3 * 2; // 2 bits per value, 3 values per triangle
@@ -93,13 +92,12 @@ static uint32* geo_unpack_delta_compressed_triangles(File_Handle file, uint32 de
 	return nullptr;
 }
 
-static float32* geo_unpack_delta_compressed_floats(File_Handle file, uint32 deflated_data_size, uint32 inflated_data_size, uint32 file_pos, uint32 item_count, uint32 components_per_item, Linear_Allocator* allocator)
+static float32* geo_unpack_delta_compressed_floats(File_Handle file, uint32 deflated_data_size, uint32 inflated_data_size, uint32 file_pos, float32* floats, uint32 item_count, uint32 components_per_item, Linear_Allocator* temp_allocator)
 {
 	if (inflated_data_size)
 	{
-		uint8* delta_compressed_data = geo_read_delta_compressed_data_from_file(file, deflated_data_size, inflated_data_size, file_pos, allocator);
-		float32* floats = (float32*)linear_allocator_alloc(allocator, item_count * components_per_item * sizeof(float32));
-
+		uint8* delta_compressed_data = geo_read_delta_compressed_data_from_file(file, deflated_data_size, inflated_data_size, file_pos, temp_allocator);
+		
 		uint8* delta_bits_section = delta_compressed_data;
 		uint32 delta_bits_count = item_count * components_per_item * 2; // 2 bits per value
 		uint32 delta_bits_section_size = (delta_bits_count + 7) / 8; // round up to nearest byte
@@ -330,9 +328,9 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 			file_start_of_packed_data_pos += 4;
 		}
 
-		uint32* triangles = geo_unpack_delta_compressed_triangles(file, deflated_triangle_data_size, inflated_triangle_data_size, file_start_of_packed_data_pos + triangle_data_offset, model_triangle_count, allocator);
+		uint32* triangles = 0;//geo_unpack_delta_compressed_triangles(file, deflated_triangle_data_size, inflated_triangle_data_size, file_start_of_packed_data_pos + triangle_data_offset, model_triangle_count, allocator);
 		//float32* vertices = geo_unpack_delta_compressed_floats(file, deflated_vertex_data_size, inflated_vertex_data_size, file_start_of_packed_data_pos + vertex_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
-		float32* normals = geo_unpack_delta_compressed_floats(file, deflated_normal_data_size, inflated_normal_data_size, file_start_of_packed_data_pos + normal_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
+		float32* normals = 0;//geo_unpack_delta_compressed_floats(file, deflated_normal_data_size, inflated_normal_data_size, file_start_of_packed_data_pos + normal_data_offset, model_vertex_count, /*components_per_item*/3, allocator);
 		//float32* texcoords = geo_unpack_delta_compressed_floats(file, deflated_texcoord_data_size, inflated_texcoord_data_size, file_start_of_packed_data_pos + texcoord_data_offset, model_vertex_count, /*components_per_item*/2, allocator);
 		
 		uint32* triangles_end = triangles + (model_triangle_count * 3);
@@ -431,10 +429,10 @@ void geo_file_check(File_Handle file, Linear_Allocator* allocator)
 	}*/
 }
 
-void geo_file_read(File_Handle file, const char** model_names, int32 model_name_count, Linear_Allocator* temp_allocator)
+void geo_file_read(File_Handle file, const char** model_names, Geo_Model* out_models, int32 model_count, Linear_Allocator* temp_allocator, Linear_Allocator* permanent_allocator)
 {
-	int32* model_indices = (int32*)linear_allocator_alloc(temp_allocator, sizeof(int32) * model_name_count);
-	for (int32 i = 0; i < model_name_count; ++i)
+	int32* model_indices = (int32*)linear_allocator_alloc(temp_allocator, sizeof(int32) * model_count);
+	for (int32 i = 0; i < model_count; ++i)
 	{
 		model_indices[i] = -1;
 	}
@@ -503,38 +501,59 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_name_
 
 	buffer_skip(&header, 12);
 	
-	uint32 model_count = buffer_read_u32(&header);
+	int32 geo_model_count = buffer_read_i32(&header);
 
 	uint8* models_section = header;
 
-	uint8* model = models_section;
-	for (uint32 model_i = 0; model_i < model_count; ++model_i)
+	int32 bytes_per_model_header = 0;
+	switch (version)
 	{
+	case 0:
+	case 2:
+		bytes_per_model_header = 216;
+		break;
+
+	case 3:
+	case 5:
+		bytes_per_model_header = 208;
+		break;
+
+	case 4:
+	case 7:
+		bytes_per_model_header = 232;
+		break;
+
+	case 8:
+		bytes_per_model_header = 244;
+		break;
+
+	default:
+		assert(false);
+		break;
+	}
+
+	for (int32 model_i = 0; model_i < geo_model_count; ++model_i)
+	{
+		uint8* model_header = models_section + (model_i * bytes_per_model_header);
+
 		const char* model_name = nullptr; // todo(jbr) remember to document the model names section and model name offset
 
 		switch (version)
 		{
 		case 0:
 		case 2:
-			model_name = (const char*)&model_names_section[*(uint32*)&model[80]];
-			model += 216;
+			model_name = (const char*)&model_names_section[*(uint32*)&model_header[80]];
 			break;
 
 		case 3:
-		case 5:
-			model_name = (const char*)&model_names_section[*(uint32*)&model[60]];
-			model += 208;
-			break;
-
 		case 4:
+		case 5:
 		case 7:
-			model_name = (const char*)&model_names_section[*(uint32*)&model[60]];
-			model += 232;
+			model_name = (const char*)&model_names_section[*(uint32*)&model_header[60]];
 			break;
 
 		case 8:
-			model_name = (const char*)&model_names_section[*(uint32*)&model[64]];
-			model += 244;
+			model_name = (const char*)&model_names_section[*(uint32*)&model_header[64]];
 			break;
 
 		default:
@@ -542,19 +561,106 @@ void geo_file_read(File_Handle file, const char** model_names, int32 model_name_
 			break;
 		}
 
-		for (int32 model_name_i = 0; model_name_i < model_name_count; ++model_name_i)
+		for (int32 model_name_i = 0; model_name_i < model_count; ++model_name_i)
 		{
+			// todo(jbr) starts with may not be enough, probably should check it starts with and followed by "__"
 			if (string_starts_with(model_name, model_names[model_name_i]))
 			{
 				model_indices[model_name_i] = model_i;
+				break;
 			}
 		}
 	}
 
-	for (int32 i = 0; i < model_name_count; ++i)
+	for (int32 i = 0; i < model_count; ++i)
 	{
 		assert(model_indices[i] > -1);
 
+		uint8* model_header = models_section + (model_indices[i] * bytes_per_model_header);
 
+		uint32	model_vertex_count = 0;
+		uint32	model_triangle_count = 0;
+		uint32	deflated_triangle_data_size = 0;
+		uint32	inflated_triangle_data_size = 0;
+		uint32	triangle_data_offset = 0;
+		uint32	deflated_vertex_data_size = 0;
+		uint32	inflated_vertex_data_size = 0;
+		uint32	vertex_data_offset = 0;
+		
+		switch (version)
+		{
+		case 0:
+		case 2:
+			model_vertex_count = *(uint32*)&model_header[28];
+			model_triangle_count = *(uint32*)&model_header[32];
+			deflated_triangle_data_size = *(uint32*)&model_header[132];
+			inflated_triangle_data_size = *(uint32*)&model_header[136];
+			triangle_data_offset = *(uint32*)&model_header[140];
+			deflated_vertex_data_size = *(uint32*)&model_header[144];
+			inflated_vertex_data_size = *(uint32*)&model_header[148];
+			vertex_data_offset = *(uint32*)&model_header[152];
+			break;
+
+		case 3:
+		case 4:
+		case 5:
+		case 7:
+			model_vertex_count = *(uint32*)&model_header[16];
+			model_triangle_count = *(uint32*)&model_header[20];
+			deflated_triangle_data_size = *(uint32*)&model_header[104];
+			inflated_triangle_data_size = *(uint32*)&model_header[108];
+			triangle_data_offset = *(uint32*)&model_header[112];
+			deflated_vertex_data_size = *(uint32*)&model_header[116];
+			inflated_vertex_data_size = *(uint32*)&model_header[120];
+			vertex_data_offset = *(uint32*)&model_header[124];
+			break;
+
+		case 8:
+			model_vertex_count = *(uint32*)&model_header[16];
+			model_triangle_count = *(uint32*)&model_header[20];
+			deflated_triangle_data_size = *(uint32*)&model_header[108];
+			inflated_triangle_data_size = *(uint32*)&model_header[112];
+			triangle_data_offset = *(uint32*)&model_header[116];
+			deflated_vertex_data_size = *(uint32*)&model_header[120];
+			inflated_vertex_data_size = *(uint32*)&model_header[124];
+			vertex_data_offset = *(uint32*)&model_header[128];
+			break;
+
+		default:
+			assert(false);
+			break;
+		}
+
+		uint32	file_start_of_packed_data_pos = file_end_of_header_pos;
+		if (version == 0)
+		{
+			file_start_of_packed_data_pos += 4;
+		}
+
+		Geo_Model* model = &out_models[i];
+		*model = {};
+		model->vertex_count = model_vertex_count;
+		model->vertices = (float32*)linear_allocator_alloc(permanent_allocator, sizeof(float32) * 3 * model_vertex_count);
+		model->triangle_count = model_triangle_count;
+		model->triangles = (uint32*)linear_allocator_alloc(permanent_allocator, sizeof(uint32) * 3 * model_triangle_count);
+
+		geo_unpack_delta_compressed_floats(
+			file, 
+			deflated_vertex_data_size, 
+			inflated_vertex_data_size, 
+			file_start_of_packed_data_pos + vertex_data_offset,
+			model->vertices,
+			model_vertex_count, 
+			/*components_per_item*/3, 
+			temp_allocator);
+
+		geo_unpack_delta_compressed_triangles(
+			file, 
+			deflated_triangle_data_size, 
+			inflated_triangle_data_size, 
+			file_start_of_packed_data_pos + triangle_data_offset, 
+			model->triangles,
+			model_triangle_count, 
+			temp_allocator);
 	}
 }

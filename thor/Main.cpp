@@ -109,8 +109,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Linear_Allocator allocator;
 	linear_allocator_create(&allocator, megabytes(128));
 
+	Linear_Allocator permanent_allocator;
+	linear_allocator_create_sub_allocator(&allocator, &permanent_allocator, megabytes(32));
+
 	Linear_Allocator temp_allocator;
-	linear_allocator_create_sub_allocator(&allocator, &temp_allocator, megabytes(64));
+	linear_allocator_create_sub_allocator(&allocator, &temp_allocator);
 
 	constexpr int32 c_max_objects_in_scene = 1024;
 	Matrix_4x4* matrices = nullptr;
@@ -124,7 +127,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		string_concat(geobin_file_path, sizeof(geobin_file_path), coh_data_path, "/geobin/maps/City_Zones/City_01_01/City_01_01.bin");
 		
 		File_Handle geobin_file = file_open_read(geobin_file_path);
-		geobin_file_read(geobin_file, "maps/City_Zones/City_01_01/City_01_01.bin", coh_data_path, &temp_allocator);
+		geobin_file_read(geobin_file, "maps/City_Zones/City_01_01/City_01_01.bin", coh_data_path, &temp_allocator, &permanent_allocator);
 		file_close(geobin_file);
 	}
 

@@ -36,7 +36,9 @@ struct Matrix_4x4
 
 int32 i32_min(int32 a, int32 b);
 
-uint32 u32_next_power_of_two(uint32 u32);
+uint32 u32_max(uint32 a, uint32 b);
+uint32 u32_round_up_power_of_two(uint32 u32);
+uint32 u32_round_down_power_of_two(uint32 u32);
 
 float32 f32_clamp(float32 f, float32 min, float32 max);
 
@@ -65,3 +67,5 @@ void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3
 void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r);
 void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r);
 void matrix_4x4_rotation_z(Matrix_4x4* matrix, float32 r);
+void matrix_4x4_rotation(Matrix_4x4* matrix, Quat rotation);
+void matrix_4x4_transform(Matrix_4x4* matrix, Vec_3f position, Quat rotation); // for an object in world with position and rotation, equivalent to doing rotation, then position translation

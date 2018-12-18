@@ -10,7 +10,12 @@ int32 i32_min(int32 a, int32 b)
 }
 
 
-uint32 u32_next_power_of_two(uint32 u32)
+uint32 u32_max(uint32 a, uint32 b)
+{
+	return a > b ? a : b;
+}
+
+uint32 u32_round_up_power_of_two(uint32 u32)
 {
 	// copy highest 1 into all other bits, then add 1, doesn't work for 0
 	--u32;
@@ -24,6 +29,11 @@ uint32 u32_next_power_of_two(uint32 u32)
 	++u32;
 
 	return u32;
+}
+
+uint32 u32_round_down_power_of_two(uint32 u32)
+{
+	return u32_round_up_power_of_two(u32) >> 1;
 }
 
 
@@ -202,6 +212,69 @@ void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation)
 	matrix->m44 = 1.0f;
 }
 
+void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b)
+{
+	assert(result != a && result != b);
+	result->m11 = (a->m11 * b->m11) + (a->m12 * b->m21) + (a->m13 * b->m31) + (a->m14 * b->m41);
+	result->m21 = (a->m21 * b->m11) + (a->m22 * b->m21) + (a->m23 * b->m31) + (a->m24 * b->m41);
+	result->m31 = (a->m31 * b->m11) + (a->m32 * b->m21) + (a->m33 * b->m31) + (a->m34 * b->m41);
+	result->m41 = (a->m41 * b->m11) + (a->m42 * b->m21) + (a->m43 * b->m31) + (a->m44 * b->m41);
+	result->m12 = (a->m11 * b->m12) + (a->m12 * b->m22) + (a->m13 * b->m32) + (a->m14 * b->m42);
+	result->m22 = (a->m21 * b->m12) + (a->m22 * b->m22) + (a->m23 * b->m32) + (a->m24 * b->m42);
+	result->m32 = (a->m31 * b->m12) + (a->m32 * b->m22) + (a->m33 * b->m32) + (a->m34 * b->m42);
+	result->m42 = (a->m41 * b->m12) + (a->m42 * b->m22) + (a->m43 * b->m32) + (a->m44 * b->m42);
+	result->m13 = (a->m11 * b->m13) + (a->m12 * b->m23) + (a->m13 * b->m33) + (a->m14 * b->m43);
+	result->m23 = (a->m21 * b->m13) + (a->m22 * b->m23) + (a->m23 * b->m33) + (a->m24 * b->m43);
+	result->m33 = (a->m31 * b->m13) + (a->m32 * b->m23) + (a->m33 * b->m33) + (a->m34 * b->m43);
+	result->m43 = (a->m41 * b->m13) + (a->m42 * b->m23) + (a->m43 * b->m33) + (a->m44 * b->m43);
+	result->m14 = (a->m11 * b->m14) + (a->m12 * b->m24) + (a->m13 * b->m34) + (a->m14 * b->m44);
+	result->m24 = (a->m21 * b->m14) + (a->m22 * b->m24) + (a->m23 * b->m34) + (a->m24 * b->m44);
+	result->m34 = (a->m31 * b->m14) + (a->m32 * b->m24) + (a->m33 * b->m34) + (a->m34 * b->m44);
+	result->m44 = (a->m41 * b->m14) + (a->m42 * b->m24) + (a->m43 * b->m34) + (a->m44 * b->m44);
+}
+
+Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v)
+{
+	return vec_3f(	(v.x * matrix->m11) + (v.y * matrix->m12) + (v.z * matrix->m13),
+					(v.x * matrix->m21) + (v.y * matrix->m22) + (v.z * matrix->m23),
+					(v.x * matrix->m31) + (v.y * matrix->m32) + (v.z * matrix->m33));
+}
+
+void matrix_4x4_camera(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up, Vec_3f right)
+{
+	// need to use camera position as the effective origin,
+	// so negate position to give that translation
+	Vec_3f translation = vec_3f_mul(position, -1.0f);
+
+	matrix->m11 = right.x;
+	matrix->m21 = forward.x;
+	matrix->m31 = up.x;
+	matrix->m41 = 0.0f;
+	matrix->m12 = right.y;
+	matrix->m22 = forward.y;
+	matrix->m32 = up.y;
+	matrix->m42 = 0.0f;
+	matrix->m13 = right.z;
+	matrix->m23 = forward.z;	
+	matrix->m33 = up.z;
+	matrix->m43 = 0.0f;
+	matrix->m14 = (right.x * translation.x) + (right.y * translation.y) + (right.z * translation.z);
+	matrix->m24 = (forward.x * translation.x) + (forward.y * translation.y) + (forward.z * translation.z);
+	matrix->m34 = (up.x * translation.x) + (up.y * translation.y) + (up.z * translation.z);
+	matrix->m44 = 1.0f;
+}
+
+void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up)
+{
+	Vec_3f view_forward = vec_3f_normalised(vec_3f_sub(target, position));
+	Vec_3f project_up_onto_forward = vec_3f_mul(view_forward, vec_3f_dot(up, view_forward));
+	Vec_3f view_up = vec_3f_normalised(vec_3f_sub(up, project_up_onto_forward));
+	Vec_3f view_right = vec_3f_cross(view_forward, view_up);
+	Vec_3f translation = vec_3f_mul(position, -1.0f);
+
+	matrix_4x4_camera(matrix, position, view_forward, view_up, view_right);
+}
+
 void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r)
 {
 	float32 cr = cosf(r);
@@ -268,65 +341,51 @@ void matrix_4x4_rotation_z(Matrix_4x4* matrix, float32 r)
 	matrix->m44 = 1.0f;
 }
 
-void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b)
+void matrix_4x4_rotation(Matrix_4x4* matrix, Quat rotation)
 {
-	assert(result != a && result != b);
-	result->m11 = (a->m11 * b->m11) + (a->m12 * b->m21) + (a->m13 * b->m31) + (a->m14 * b->m41);
-	result->m21 = (a->m21 * b->m11) + (a->m22 * b->m21) + (a->m23 * b->m31) + (a->m24 * b->m41);
-	result->m31 = (a->m31 * b->m11) + (a->m32 * b->m21) + (a->m33 * b->m31) + (a->m34 * b->m41);
-	result->m41 = (a->m41 * b->m11) + (a->m42 * b->m21) + (a->m43 * b->m31) + (a->m44 * b->m41);
-	result->m12 = (a->m11 * b->m12) + (a->m12 * b->m22) + (a->m13 * b->m32) + (a->m14 * b->m42);
-	result->m22 = (a->m21 * b->m12) + (a->m22 * b->m22) + (a->m23 * b->m32) + (a->m24 * b->m42);
-	result->m32 = (a->m31 * b->m12) + (a->m32 * b->m22) + (a->m33 * b->m32) + (a->m34 * b->m42);
-	result->m42 = (a->m41 * b->m12) + (a->m42 * b->m22) + (a->m43 * b->m32) + (a->m44 * b->m42);
-	result->m13 = (a->m11 * b->m13) + (a->m12 * b->m23) + (a->m13 * b->m33) + (a->m14 * b->m43);
-	result->m23 = (a->m21 * b->m13) + (a->m22 * b->m23) + (a->m23 * b->m33) + (a->m24 * b->m43);
-	result->m33 = (a->m31 * b->m13) + (a->m32 * b->m23) + (a->m33 * b->m33) + (a->m34 * b->m43);
-	result->m43 = (a->m41 * b->m13) + (a->m42 * b->m23) + (a->m43 * b->m33) + (a->m44 * b->m43);
-	result->m14 = (a->m11 * b->m14) + (a->m12 * b->m24) + (a->m13 * b->m34) + (a->m14 * b->m44);
-	result->m24 = (a->m21 * b->m14) + (a->m22 * b->m24) + (a->m23 * b->m34) + (a->m24 * b->m44);
-	result->m34 = (a->m31 * b->m14) + (a->m32 * b->m24) + (a->m33 * b->m34) + (a->m34 * b->m44);
-	result->m44 = (a->m41 * b->m14) + (a->m42 * b->m24) + (a->m43 * b->m34) + (a->m44 * b->m44);
-}
-
-Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v)
-{
-	return vec_3f(	(v.x * matrix->m11) + (v.y * matrix->m12) + (v.z * matrix->m13),
-					(v.x * matrix->m21) + (v.y * matrix->m22) + (v.z * matrix->m23),
-					(v.x * matrix->m31) + (v.y * matrix->m32) + (v.z * matrix->m33));
-}
-
-void matrix_4x4_camera(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up, Vec_3f right)
-{
-	// need to use camera position as the effective origin,
-	// so negate position to give that translation
-	Vec_3f translation = vec_3f_mul(position, -1.0f);
-
-	matrix->m11 = right.x;
-	matrix->m21 = forward.x;
-	matrix->m31 = up.x;
+	// mx1 is right (x axis)
+	// mx2 is forward (y axis)
+	// mx3 is up (z axis)
+	
+	/*
+	float32 x = (q.scalar * q.scalar * v.x) + (-2.0f * q.scalar * q.yx * v.y) + (2.0f * q.scalar * q.xz * v.z) + (q.zy * q.zy * v.x) + (2.0f * q.zy * q.xz * v.y) + (2.0f * q.zy * q.yx * v.z) + (-1.0f * q.xz * q.xz * v.x) + (-1.0f * q.yx * q.yx * v.x);
+	float32 y = (2.0f * q.scalar * q.yx * v.x) + (q.scalar * q.scalar * v.y) + (-2.0f * q.scalar * q.zy * v.z) + (2.0f * q.zy * q.xz * v.x) + (-1.0f * q.zy * q.zy * v.y) + (q.xz * q.xz * v.y) + (2.0f * q.xz * q.yx * v.z) + (-1.0f * q.yx * q.yx * v.y);
+	float32 z = (-2.0f * q.scalar * q.xz * v.x) + (2.0f * q.scalar * q.zy * v.y) + (q.scalar * q.scalar * v.z) + (2.0f * q.zy * q.yx * v.x) + (-1.0f * q.zy * q.zy * v.z) + (2.0f * q.xz * q.yx * v.y) + (-1.0f * q.xz * q.xz * v.z) + (q.yx * q.yx * v.z);
+	*/
+	
+	// x axis
+	// we can be faster than quat_mul because we know x is 1, and y/z is 0
+	matrix->m11 = (rotation.scalar * rotation.scalar) + (rotation.zy * rotation.zy) + (-1.0f * rotation.xz * rotation.xz) + (-1.0f * rotation.yx * rotation.yx);
+	matrix->m21 = (2.0f * rotation.scalar * rotation.yx) + (2.0f * rotation.zy * rotation.xz);
+	matrix->m31 = (-2.0f * rotation.scalar * rotation.xz) + (2.0f * rotation.zy * rotation.yx);
 	matrix->m41 = 0.0f;
-	matrix->m12 = right.y;
-	matrix->m22 = forward.y;
-	matrix->m32 = up.y;
+
+	// y axis
+	matrix->m12 = ;
+	matrix->m22 = ;
+	matrix->m32 = ;
 	matrix->m42 = 0.0f;
-	matrix->m13 = right.z;
-	matrix->m23 = forward.z;	
-	matrix->m33 = up.z;
+
+	// z axis
+	matrix->m13 = ;
+	matrix->m23 = ;
+	matrix->m33 = ;
 	matrix->m43 = 0.0f;
-	matrix->m14 = (right.x * translation.x) + (right.y * translation.y) + (right.z * translation.z);
-	matrix->m24 = (forward.x * translation.x) + (forward.y * translation.y) + (forward.z * translation.z);
-	matrix->m34 = (up.x * translation.x) + (up.y * translation.y) + (up.z * translation.z);
+
+	// translation
+	matrix->m14 = 0.0f;
+	matrix->m24 = 0.0f;
+	matrix->m34 = 0.0f;
 	matrix->m44 = 1.0f;
 }
 
-void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up)
+void matrix_4x4_transform(Matrix_4x4* matrix, Vec_3f position, Quat rotation)
 {
-	Vec_3f view_forward = vec_3f_normalised(vec_3f_sub(target, position));
-	Vec_3f project_up_onto_forward = vec_3f_mul(view_forward, vec_3f_dot(up, view_forward));
-	Vec_3f view_up = vec_3f_normalised(vec_3f_sub(up, project_up_onto_forward));
-	Vec_3f view_right = vec_3f_cross(view_forward, view_up);
-	Vec_3f translation = vec_3f_mul(position, -1.0f);
+	// rotation THEN translation
+	matrix_4x4_rotation(matrix, rotation);
 
-	matrix_4x4_camera(matrix, position, view_forward, view_up, view_right);
+	// rotation matrix is orthogonal 3x3, so it's easy to add the translation
+	matrix->m14 = position.x;
+	matrix->m24 = position.y;
+	matrix->m34 = position.z;
 }
