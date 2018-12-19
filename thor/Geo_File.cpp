@@ -561,10 +561,18 @@ void geo_file_read(File_Handle file, const char** model_names, Geo_Model* out_mo
 			break;
 		}
 
+		// model name often has trick appended e.g. model_name__trick_name
+		char temp_model_name[64];
+		int32 trick_start_index = string_find_last(model_name, "__");
+		if (trick_start_index > -1)
+		{
+			string_copy(temp_model_name, sizeof(temp_model_name), model_name, trick_start_index);
+			model_name = temp_model_name;
+		}
+
 		for (int32 model_name_i = 0; model_name_i < model_count; ++model_name_i)
 		{
-			// todo(jbr) starts with may not be enough, probably should check it starts with and followed by "__"
-			if (string_starts_with(model_name, model_names[model_name_i]))
+			if (string_equals(model_name, model_names[model_name_i]))
 			{
 				model_indices[model_name_i] = model_i;
 				break;

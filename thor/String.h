@@ -13,6 +13,7 @@ bool string_contains(const char* str, const char* contains);
 int32 string_find(const char* str, char c);
 int32 string_find_last(const char* str, char c);
 int32 string_find_last(const char* str, char c, int32 start);
+int32 string_find_last(const char* str, const char* find);
 int32 string_copy(char* dst, int32 dst_size, const char* src);
 int32 string_copy(char* dst, int32 dst_size, const char* src, int32 count);
 char* string_copy(const char* src, struct Linear_Allocator* allocator);

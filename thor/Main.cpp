@@ -131,8 +131,10 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		file_close(geobin_file);
 	}
 
-	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&allocator, sizeof(Graphics_State));
-	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, num_objects_in_scene, &allocator, &temp_allocator);
+	linear_allocator_reset(&temp_allocator);
+
+	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&permanent_allocator, sizeof(Graphics_State));
+	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, num_objects_in_scene, &permanent_allocator, &temp_allocator);
 
 	bool32 was_mouse_down = 0;
 	int32 mouse_x_on_mouse_down = 0;

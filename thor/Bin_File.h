@@ -13,9 +13,17 @@ constexpr uint32 c_bin_defnames_type_id = 0x0c027625;
 
 
 
+struct Geo_Model_Instances
+{
+	Matrix_4x4* transforms;
+	int32 transform_count;
+};
+
+
+
 /**
  * check a bin file can be successfully parsed
  */
 void bin_file_check(File_Handle file);
 
-void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, struct Linear_Allocator* temp_allocator, Linear_Allocator* permanent_allocator);
+void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, struct Linear_Allocator* temp_allocator, Linear_Allocator* permanent_allocator, int32* out_model_count, Geo_Model_Instances** out_model_instances);

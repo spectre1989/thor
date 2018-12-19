@@ -923,7 +923,7 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 	}
 }
 
-void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, Linear_Allocator* temp_allocator, Linear_Allocator* permanent_allocator)
+void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, Linear_Allocator* temp_allocator, Linear_Allocator* model_allocator, Linear_Allocator* model_instance_allocator, int32* out_model_count, Geo_Model_Instances** out_model_instances)
 {
 	char defnames_file_path[256];
 	string_concat(defnames_file_path, sizeof(defnames_file_path), coh_data_path, "/bin/defnames.bin");
@@ -955,10 +955,6 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 	char geo_base_path[256];
 	string_concat(geo_base_path, sizeof(geo_base_path), coh_data_path, "/");
 
-	// create a temp sub-allocator, so it can be reset for the parsing of each geo file
-	Linear_Allocator geo_temp_allocator;
-	linear_allocator_create_sub_allocator(temp_allocator, &geo_temp_allocator);
-
 	int32 total_model_count = 0;
 	int32 total_instance_count = 0;
 	Geo* geo = geos;
@@ -969,33 +965,23 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 		{
 			++total_model_count;
 
-			Model_Instance* instance = model->instances;
-			while (instance)
-			{
-				++total_instance_count;
-				instance = instance->next;
-			}
-
 			model = model->next;
 		}
 
 		geo = geo->next;
 	}
 
-	Geo_Model* models = (Geo_Model*)linear_allocator_alloc(permanent_allocator, sizeof(Geo_Model) * total_model_count);
-
-	struct Model_Instance_Transforms
-	{
-		Matrix_4x4* transforms_begin;
-		Matrix_4x4* transforms_end;
-	};
-
-	Model_Instance_Transforms* model_instance_transforms = (Model_Instance_Transforms*)linear_allocator_alloc(permanent_allocator, sizeof(Model_Instance_Transforms) * total_model_count);
-	Matrix_4x4* transforms = (Matrix_4x4*)linear_allocator_alloc(permanent_allocator, sizeof(Matrix_4x4) * total_instance_count);
-
-	Geo_Model* models_for_geo = models;
-	Model_Instance_Transforms* instance_transforms_for_model = model_instance_transforms;
-	Matrix_4x4* transforms_for_model = transforms;
+	Geo_Model* models = (Geo_Model*)linear_allocator_alloc(model_allocator, sizeof(Geo_Model) * total_model_count);
+	Geo_Model_Instances* model_instances = (Geo_Model_Instances*)linear_allocator_alloc(model_instance_allocator, sizeof(Geo_Model_Instances) * total_model_count);
+	
+	// create a temp sub-allocator, so it can be reset for the parsing of each geo file
+	Linear_Allocator geo_temp_allocator;
+	linear_allocator_create_sub_allocator(temp_allocator, &geo_temp_allocator);
+	
+	// as we go write models/model instances here
+	Geo_Model* current_model = models;
+	Geo_Model_Instances* current_model_instances = model_instances;
+	
 	geo = geos;
 	while (geo)
 	{
@@ -1022,28 +1008,40 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 		string_concat(geo_file_path, sizeof(geo_file_path), geo_base_path, geo->relative_file_path);
 
 		File_Handle geo_file = file_open_read(geo_file_path);
-		geo_file_read(geo_file, model_names, models_for_geo, model_count, &geo_temp_allocator, permanent_allocator);
-		models_for_geo += model_count;
+		geo_file_read(geo_file, model_names, current_model, model_count, &geo_temp_allocator, model_allocator);
+		current_model += model_count;
 		file_close(geo_file);
 		
 		model = geo->models;
 		while (model)
 		{
-			instance_transforms_for_model->transforms_begin = transforms_for_model;
-
 			Model_Instance* instance = model->instances;
 			while (instance)
 			{
-				matrix_4x4_transform(transforms_for_model, instance->position, instance->rotation);
-				++transforms_for_model;
+				++current_model_instances->transform_count;
+				instance = instance->next;
 			}
 
-			instance_transforms_for_model->transforms_end = transforms_for_model;
-			++instance_transforms_for_model;
+			current_model_instances->transforms = (Matrix_4x4*)linear_allocator_alloc(model_instance_allocator, sizeof(Matrix_4x4) * current_model_instances->transform_count);
+
+			Matrix_4x4* current_transform = current_model_instances->transforms;
+			instance = model->instances;
+			while (instance)
+			{
+				matrix_4x4_transform(current_transform, instance->position, instance->rotation);
+				++current_transform;
+
+				instance = instance->next;
+			}
+
+			++current_model_instances;
 
 			model = model->next;
 		}
 
 		geo = geo->next;
 	}
+
+	*out_model_count = total_model_count;
+	*out_model_instances = model_instances;
 }

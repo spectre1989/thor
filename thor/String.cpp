@@ -142,6 +142,34 @@ int32 string_find_last(const char* str, char c, int32 start)
 	return -1;
 }
 
+int32 string_find_last(const char* str, const char* find)
+{
+	int32 str_char_count = string_length(str);
+	int32 find_char_count = string_length(find);
+
+	const char* str_iter = &str[str_char_count - 1];
+	const char* find_iter = &find[find_char_count - 1];
+	while (str_iter >= str)
+	{
+		if (*str_iter == *find_iter)
+		{
+			if (find_iter == find)
+			{
+				return (int32)(str_iter - str);
+			}
+			--find_iter;
+		}
+		else
+		{
+			find_iter = &find[find_char_count - 1];
+		}
+
+		--str_iter;
+	}
+
+	return -1;
+}
+
 int32 string_copy(char* dst, int32 dst_size, const char* src)
 {
 	char* dst_iter = dst;

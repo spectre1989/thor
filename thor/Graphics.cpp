@@ -209,9 +209,9 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 	// for now just try to pick a dedicated gpu if available
 	// todo(jbr) properly examine gpus and decide on best one
+	VkPhysicalDeviceProperties gpu_properties;
 	for (uint32 i = 0; i < gpu_count; ++i)
 	{
-		VkPhysicalDeviceProperties gpu_properties;
 		vkGetPhysicalDeviceProperties(gpus[i], &gpu_properties);
 
 		if (gpu_properties.deviceType == VkPhysicalDeviceType::VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
@@ -222,6 +222,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	}
 	if (!graphics_state->gpu)
 	{
+		vkGetPhysicalDeviceProperties(gpus[0], &gpu_properties);
 		graphics_state->gpu = gpus[0];
 	}
 		
@@ -482,7 +483,69 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &depth_buffer_image_view);
 	assert(result == VK_SUCCESS);
 
-	const uint32 matrix_count = num_objects_in_scene > 0 ? num_objects_in_scene : 1;
+	struct UBO
+	{
+		struct Model
+		{
+			int32 index;
+			Model* next;
+		};
+
+		uint32 instance_count;
+		Model* models;
+		UBO* next;
+	};
+	struct ModelThing
+	{
+		int32 instance_count;
+	};
+	ModelThing* models;
+	int32 model_count;
+	UBO* ubos = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
+	*ubos = {};
+	constexpr int32 c_ubo_size_per_instance = sizeof(float32) * 4 * 4;
+	int32 max_instances_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_ubo_size_per_instance;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
+	{
+		ModelThing* model = &models[model_i];
+		int32 instance_count_remaining = model->instance_count; // may not be able to fit all instances in a single UBO
+		while (instance_count_remaining)
+		{
+			int32 instance_count = i32_min(instance_count_remaining, max_instances_per_ubo);
+
+			UBO* ubo = ubos;
+			while (ubo)
+			{
+				if ((ubo->instance_count + instance_count) <= max_instances_per_ubo)
+				{
+					break;
+				}
+
+				ubo = ubo->next;
+			}
+
+			if (!ubo)
+			{
+				// couldn't fit 
+				ubo = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
+				*ubo = {};
+				ubo->next = ubos;
+				ubos = ubo;
+			}
+
+			ubo->instance_count += instance_count;
+
+			UBO::Model* ubo_model = (UBO::Model*)linear_allocator_alloc(temp_allocator, sizeof(UBO::Model));
+			*ubo_model = {};
+			ubo_model->index = model_i;
+			ubo_model->next = ubo->models;
+			ubo->models = ubo_model;
+
+			instance_count_remaining -= instance_count;
+		}
+	}
+
+	const uint32 matrix_count = num_objects_in_scene > 0 ? num_objects_in_scene : 1025;
 	const uint32 ubo_size = matrix_count * 4 * 4 * sizeof(float32);
 
 	VkBuffer uniform_buffer;

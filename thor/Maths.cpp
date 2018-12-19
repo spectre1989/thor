@@ -343,16 +343,6 @@ void matrix_4x4_rotation_z(Matrix_4x4* matrix, float32 r)
 
 void matrix_4x4_rotation(Matrix_4x4* matrix, Quat rotation)
 {
-	// mx1 is right (x axis)
-	// mx2 is forward (y axis)
-	// mx3 is up (z axis)
-	
-	/*
-	float32 x = (q.scalar * q.scalar * v.x) + (-2.0f * q.scalar * q.yx * v.y) + (2.0f * q.scalar * q.xz * v.z) + (q.zy * q.zy * v.x) + (2.0f * q.zy * q.xz * v.y) + (2.0f * q.zy * q.yx * v.z) + (-1.0f * q.xz * q.xz * v.x) + (-1.0f * q.yx * q.yx * v.x);
-	float32 y = (2.0f * q.scalar * q.yx * v.x) + (q.scalar * q.scalar * v.y) + (-2.0f * q.scalar * q.zy * v.z) + (2.0f * q.zy * q.xz * v.x) + (-1.0f * q.zy * q.zy * v.y) + (q.xz * q.xz * v.y) + (2.0f * q.xz * q.yx * v.z) + (-1.0f * q.yx * q.yx * v.y);
-	float32 z = (-2.0f * q.scalar * q.xz * v.x) + (2.0f * q.scalar * q.zy * v.y) + (q.scalar * q.scalar * v.z) + (2.0f * q.zy * q.yx * v.x) + (-1.0f * q.zy * q.zy * v.z) + (2.0f * q.xz * q.yx * v.y) + (-1.0f * q.xz * q.xz * v.z) + (q.yx * q.yx * v.z);
-	*/
-	
 	// x axis
 	// we can be faster than quat_mul because we know x is 1, and y/z is 0
 	matrix->m11 = (rotation.scalar * rotation.scalar) + (rotation.zy * rotation.zy) + (-1.0f * rotation.xz * rotation.xz) + (-1.0f * rotation.yx * rotation.yx);
@@ -361,15 +351,15 @@ void matrix_4x4_rotation(Matrix_4x4* matrix, Quat rotation)
 	matrix->m41 = 0.0f;
 
 	// y axis
-	matrix->m12 = ;
-	matrix->m22 = ;
-	matrix->m32 = ;
+	matrix->m12 = (-2.0f * rotation.scalar * rotation.yx) + (2.0f * rotation.zy * rotation.xz);
+	matrix->m22 = (rotation.scalar * rotation.scalar) + (-1.0f * rotation.zy * rotation.zy) + (rotation.xz * rotation.xz) + (-1.0f * rotation.yx * rotation.yx);
+	matrix->m32 = (2.0f * rotation.scalar * rotation.zy) + (2.0f * rotation.xz * rotation.yx);
 	matrix->m42 = 0.0f;
 
 	// z axis
-	matrix->m13 = ;
-	matrix->m23 = ;
-	matrix->m33 = ;
+	matrix->m13 = (2.0f * rotation.scalar * rotation.xz) + (2.0f * rotation.zy * rotation.yx);
+	matrix->m23 = (-2.0f * rotation.scalar * rotation.zy) + (2.0f * rotation.xz * rotation.yx);
+	matrix->m33 = (rotation.scalar * rotation.scalar) + (-1.0f * rotation.zy * rotation.zy) + (-1.0f * rotation.xz * rotation.xz) + (rotation.yx * rotation.yx);
 	matrix->m43 = 0.0f;
 
 	// translation
