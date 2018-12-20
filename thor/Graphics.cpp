@@ -209,7 +209,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 	// for now just try to pick a dedicated gpu if available
 	// todo(jbr) properly examine gpus and decide on best one
-	VkPhysicalDeviceProperties gpu_properties;
+	VkPhysicalDeviceProperties gpu_properties = {};
 	for (uint32 i = 0; i < gpu_count; ++i)
 	{
 		vkGetPhysicalDeviceProperties(gpus[i], &gpu_properties);
@@ -491,24 +491,21 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 			Model* next;
 		};
 
-		uint32 instance_count;
+		int32 instance_count;
 		Model* models;
 		UBO* next;
 	};
-	struct ModelThing
-	{
-		int32 instance_count;
-	};
-	ModelThing* models;
-	int32 model_count;
+	
+	Model_Instances* model_instances = nullptr;
+	int32 model_count = 0;
 	UBO* ubos = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
 	*ubos = {};
 	constexpr int32 c_ubo_size_per_instance = sizeof(float32) * 4 * 4;
 	int32 max_instances_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_ubo_size_per_instance;
 	for (int32 model_i = 0; model_i < model_count; ++model_i)
 	{
-		ModelThing* model = &models[model_i];
-		int32 instance_count_remaining = model->instance_count; // may not be able to fit all instances in a single UBO
+		Model_Instances* instances = &model_instances[model_i];
+		int32 instance_count_remaining = instances->transform_count; // may not be able to fit all instances in a single UBO
 		while (instance_count_remaining)
 		{
 			int32 instance_count = i32_min(instance_count_remaining, max_instances_per_ubo);

@@ -3,6 +3,7 @@
 #include <cstdio>
 #include "File.h"
 #include "Geo_File.h"
+#include "Graphics.h"
 #include "Memory.h"
 #include "String.h"
 
@@ -564,17 +565,17 @@ struct Model_Instance
 	Model_Instance* next;
 };
 
-struct Model
+struct Geo_Model
 {
 	const char* name;
 	Model_Instance* instances;
-	Model* next;
+	Geo_Model* next;
 };
 
 struct Geo
 {
 	const char* relative_file_path;
-	Model* models;
+	Geo_Model* models;
 	Geo* next;
 };
 
@@ -790,7 +791,7 @@ static void add_model_instance(const char* relative_geo_file_path, const char* m
 		*geos = geo;
 	}
 
-	Model* model = geo->models;
+	Geo_Model* model = geo->models;
 	while (model)
 	{
 		if (string_equals(model->name, model_name))
@@ -803,7 +804,7 @@ static void add_model_instance(const char* relative_geo_file_path, const char* m
 
 	if (!model)
 	{
-		model = (Model*)linear_allocator_alloc(allocator, sizeof(Model));
+		model = (Geo_Model*)linear_allocator_alloc(allocator, sizeof(Geo_Model));
 		*model = {};
 
 		model->name = model_name;
@@ -923,7 +924,7 @@ static void recursively_find_models(Geobin* geobin, Def* def, Vec_3f def_positio
 	}
 }
 
-void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, Linear_Allocator* temp_allocator, Linear_Allocator* model_allocator, Linear_Allocator* model_instance_allocator, int32* out_model_count, Geo_Model_Instances** out_model_instances)
+void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, Linear_Allocator* model_allocator, int32* out_model_count, Model_Instances** out_model_instances, Linear_Allocator* model_instance_allocator, Linear_Allocator* temp_allocator)
 {
 	char defnames_file_path[256];
 	string_concat(defnames_file_path, sizeof(defnames_file_path), coh_data_path, "/bin/defnames.bin");
@@ -956,66 +957,65 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 	string_concat(geo_base_path, sizeof(geo_base_path), coh_data_path, "/");
 
 	int32 total_model_count = 0;
-	int32 total_instance_count = 0;
 	Geo* geo = geos;
 	while (geo)
 	{
-		Model* model = geo->models;
-		while (model)
+		Geo_Model* geo_model = geo->models;
+		while (geo_model)
 		{
 			++total_model_count;
 
-			model = model->next;
+			geo_model = geo_model->next;
 		}
 
 		geo = geo->next;
 	}
 
-	Geo_Model* models = (Geo_Model*)linear_allocator_alloc(model_allocator, sizeof(Geo_Model) * total_model_count);
-	Geo_Model_Instances* model_instances = (Geo_Model_Instances*)linear_allocator_alloc(model_instance_allocator, sizeof(Geo_Model_Instances) * total_model_count);
+	Model* models = (Model*)linear_allocator_alloc(model_allocator, sizeof(Model) * total_model_count);
+	Model_Instances* model_instances = (Model_Instances*)linear_allocator_alloc(model_instance_allocator, sizeof(Model_Instances) * total_model_count);
 	
 	// create a temp sub-allocator, so it can be reset for the parsing of each geo file
 	Linear_Allocator geo_temp_allocator;
 	linear_allocator_create_sub_allocator(temp_allocator, &geo_temp_allocator);
 	
 	// as we go write models/model instances here
-	Geo_Model* current_model = models;
-	Geo_Model_Instances* current_model_instances = model_instances;
+	Model* current_model = models;
+	Model_Instances* current_model_instances = model_instances;
 	
 	geo = geos;
 	while (geo)
 	{
 		linear_allocator_reset(&geo_temp_allocator);
 
-		Model* model = geo->models;
+		Geo_Model* geo_model = geo->models;
 		int32 model_count = 0;
-		while (model)
+		while (geo_model)
 		{
 			++model_count;
-			model = model->next;
+			geo_model = geo_model->next;
 		}
 
 		const char** model_names = (const char**)linear_allocator_alloc(&geo_temp_allocator, sizeof(const char*) * model_count);
-		model = geo->models;
+		geo_model = geo->models;
 		int32 model_i = 0;
-		while (model)
+		while (geo_model)
 		{
-			model_names[model_i++] = model->name;
-			model = model->next;
+			model_names[model_i++] = geo_model->name;
+			geo_model = geo_model->next;
 		}
 
 		char geo_file_path[256];
 		string_concat(geo_file_path, sizeof(geo_file_path), geo_base_path, geo->relative_file_path);
 
 		File_Handle geo_file = file_open_read(geo_file_path);
-		geo_file_read(geo_file, model_names, current_model, model_count, &geo_temp_allocator, model_allocator);
+		geo_file_read(geo_file, model_names, current_model, model_count, model_allocator, &geo_temp_allocator);
 		current_model += model_count;
 		file_close(geo_file);
 		
-		model = geo->models;
-		while (model)
+		geo_model = geo->models;
+		while (geo_model)
 		{
-			Model_Instance* instance = model->instances;
+			Model_Instance* instance = geo_model->instances;
 			while (instance)
 			{
 				++current_model_instances->transform_count;
@@ -1025,7 +1025,7 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 			current_model_instances->transforms = (Matrix_4x4*)linear_allocator_alloc(model_instance_allocator, sizeof(Matrix_4x4) * current_model_instances->transform_count);
 
 			Matrix_4x4* current_transform = current_model_instances->transforms;
-			instance = model->instances;
+			instance = geo_model->instances;
 			while (instance)
 			{
 				matrix_4x4_transform(current_transform, instance->position, instance->rotation);
@@ -1036,7 +1036,7 @@ void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, c
 
 			++current_model_instances;
 
-			model = model->next;
+			geo_model = geo_model->next;
 		}
 
 		geo = geo->next;

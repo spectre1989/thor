@@ -112,29 +112,41 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Linear_Allocator permanent_allocator;
 	linear_allocator_create_sub_allocator(&allocator, &permanent_allocator, megabytes(32));
 
-	Linear_Allocator temp_allocator;
-	linear_allocator_create_sub_allocator(&allocator, &temp_allocator);
-
 	constexpr int32 c_max_objects_in_scene = 1024;
 	Matrix_4x4* matrices = nullptr;
 	int32 num_objects_in_scene = 0;
 
-	if (string_length(cmd_line))
-	{
-		const char* coh_data_path = cmd_line;
+	assert(string_length(cmd_line))
+	
+	Linear_Allocator allocator_snapshot = allocator; // use this to restore allocator later
 
-		char geobin_file_path[256];
-		string_concat(geobin_file_path, sizeof(geobin_file_path), coh_data_path, "/geobin/maps/City_Zones/City_01_01/City_01_01.bin");
+	const char* coh_data_path = cmd_line;
+
+	char geobin_file_path[256];
+	string_concat(geobin_file_path, sizeof(geobin_file_path), coh_data_path, "/geobin/maps/City_Zones/City_01_01/City_01_01.bin");
 		
-		File_Handle geobin_file = file_open_read(geobin_file_path);
-		geobin_file_read(geobin_file, "maps/City_Zones/City_01_01/City_01_01.bin", coh_data_path, &temp_allocator, &permanent_allocator);
-		file_close(geobin_file);
-	}
+	// store the model instances parsed from geobin here, it isn't permanent but needs to live for a little while
+	// until the data gets rearranged and stored in an optimal order by graphics_init(), then this can be chucked away
+	Linear_Allocator model_instance_allocator;
+	linear_allocator_create_sub_allocator(&allocator, &model_instance_allocator, megabytes(32));
+
+	Linear_Allocator temp_allocator;
+	linear_allocator_create_sub_allocator(&allocator, &temp_allocator);
+
+	int32 model_count;
+	Model_Instances* model_instances;
+
+	File_Handle geobin_file = file_open_read(geobin_file_path);
+	geobin_file_read(geobin_file, "maps/City_Zones/City_01_01/City_01_01.bin", coh_data_path, &permanent_allocator /*model_allocator*/, &model_count, &model_instances, &model_instance_allocator, &temp_allocator);
+	file_close(geobin_file);
 
 	linear_allocator_reset(&temp_allocator);
 
 	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&permanent_allocator, sizeof(Graphics_State));
 	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, num_objects_in_scene, &permanent_allocator, &temp_allocator);
+
+	// now throw away all allocators after permanent allocator
+	allocator = allocator_snapshot;
 
 	bool32 was_mouse_down = 0;
 	int32 mouse_x_on_mouse_down = 0;

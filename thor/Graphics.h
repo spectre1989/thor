@@ -21,5 +21,20 @@ struct Graphics_State
 	Matrix_4x4 projection_matrix;
 };
 
+struct Model
+{
+	float32* vertices;
+	uint32 vertex_count;
+	uint32* triangles;
+	uint32 triangle_count;
+};
+
+struct Model_Instances
+{
+	Matrix_4x4* transforms;
+	int32 transform_count;
+};
+
+
 void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, int32 num_objects_in_scene, struct Linear_Allocator* allocator, Linear_Allocator* temp_allocator);
 void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Matrix_4x4* object_matrices, int32 num_objects);
