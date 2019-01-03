@@ -13,6 +13,29 @@ constexpr uint32 c_bin_defnames_type_id = 0x0c027625;
 
 
 
+struct Model_Instance
+{
+	Vec_3f position;
+	Quat rotation;
+	Model_Instance* next;
+};
+
+struct Geo_Model
+{
+	const char* name;
+	Model_Instance* instances;
+	Geo_Model* next;
+};
+
+struct Geo
+{
+	const char* relative_file_path;
+	Geo_Model* models;
+	Geo* next;
+};
+
+
+
 /**
  * check a bin file can be successfully parsed
  */

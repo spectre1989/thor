@@ -1,5 +1,6 @@
 #include "Graphics.h"
 
+#include "Bin_File.h" // todo(jbr) shouldn't have this dependency
 #include "File.h"
 #include "Memory.h"
 #include <vulkan/vulkan.h>
@@ -142,7 +143,7 @@ static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, in
 	indices[index_offset++] = uint16(vertex_offset + 2);
 }
 
-void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, int32 num_objects_in_scene, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
+void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Geo* geos, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
 
@@ -487,60 +488,162 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	{
 		struct Model
 		{
-			int32 index;
+			Geo_Model* geo_model;
 			Model* next;
 		};
 
-		int32 instance_count;
-		Model* models;
+		Matrix_4x4* transforms;
+		int32 transform_count;
+		Model* models_head;
+		Model* models_tail;
 		UBO* next;
 	};
 	
-	Model_Instances* model_instances = nullptr;
-	int32 model_count = 0;
-	UBO* ubos = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
-	*ubos = {};
-	constexpr int32 c_ubo_size_per_instance = sizeof(float32) * 4 * 4;
-	int32 max_instances_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_ubo_size_per_instance;
-	for (int32 model_i = 0; model_i < model_count; ++model_i)
-	{
-		Model_Instances* instances = &model_instances[model_i];
-		int32 instance_count_remaining = instances->transform_count; // may not be able to fit all instances in a single UBO
-		while (instance_count_remaining)
-		{
-			int32 instance_count = i32_min(instance_count_remaining, max_instances_per_ubo);
+	UBO* ubo = nullptr;
+	constexpr int32 c_ubo_size_per_transform = sizeof(float32) * 4 * 4;
+	int32 max_transforms_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_ubo_size_per_transform;
 
-			UBO* ubo = ubos;
-			while (ubo)
+	Geo* geo = geos;
+	while (geo)
+	{
+		Geo_Model* model = geo->models;
+		while (model)
+		{
+			Model_Instance* instance = model->instances;
+			while (instance)
 			{
-				if ((ubo->instance_count + instance_count) <= max_instances_per_ubo)
+				if (!ubo || ubo->transform_count == max_transforms_per_ubo)
 				{
-					break;
+					UBO* new_ubo = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
+					*new_ubo = {};
+					new_ubo->transforms = (Matrix_4x4*)linear_allocator_alloc(allocator, sizeof(Matrix_4x4) * max_transforms_per_ubo);
+
+					new_ubo->next = ubo;
+					ubo = new_ubo;
 				}
 
-				ubo = ubo->next;
+				matrix_4x4_transform(&ubo->transforms[ubo->transform_count], instance->position, instance->rotation);
+				++ubo->transform_count;
+
+				instance = instance->next;
 			}
-
-			if (!ubo)
-			{
-				// couldn't fit 
-				ubo = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
-				*ubo = {};
-				ubo->next = ubos;
-				ubos = ubo;
-			}
-
-			ubo->instance_count += instance_count;
-
+			
 			UBO::Model* ubo_model = (UBO::Model*)linear_allocator_alloc(temp_allocator, sizeof(UBO::Model));
 			*ubo_model = {};
-			ubo_model->index = model_i;
-			ubo_model->next = ubo->models;
-			ubo->models = ubo_model;
+			ubo_model->geo_model = model;
+			if (ubo->models_tail)
+			{
+				ubo->models_tail->next = ubo_model;
+				ubo->models_tail = ubo_model;
+			}
+			else
+			{
+				ubo->models_head = ubo_model;
+				ubo->models_tail = ubo_model;
+			}
 
-			instance_count_remaining -= instance_count;
+			model = model->next;
 		}
 	}
+
+	/* 
+	old shit that used to be in geobin loading 
+	
+	char geo_base_path[256];
+	string_concat(geo_base_path, sizeof(geo_base_path), coh_data_path, "/");
+
+	int32 total_model_count = 0;
+	Geo* geo = geos;
+	while (geo)
+	{
+		Geo_Model* geo_model = geo->models;
+		while (geo_model)
+		{
+			++total_model_count;
+
+			geo_model = geo_model->next;
+		}
+
+		geo = geo->next;
+	}
+
+	Model* models = (Model*)linear_allocator_alloc(model_allocator, sizeof(Model) * total_model_count);
+	Model_Instances* model_instances = (Model_Instances*)linear_allocator_alloc(model_instance_allocator, sizeof(Model_Instances) * total_model_count);
+	
+	// as we go write models/model instances here
+	Model* current_model = models;
+	Model_Instances* current_model_instances = model_instances;
+	
+	geo = geos;
+	while (geo)
+	{
+		// reset the geo temp allocator for each file
+		Linear_Allocator geo_temp_allocator = *temp_allocator;
+
+		// count the models we want from this geo so we can make an array of model names
+		Geo_Model* geo_model = geo->models;
+		int32 model_count = 0;
+		while (geo_model)
+		{
+			++model_count;
+			geo_model = geo_model->next;
+		}
+
+		// make array of model names
+		const char** model_names = (const char**)linear_allocator_alloc(&geo_temp_allocator, sizeof(const char*) * model_count);
+		geo_model = geo->models;
+		int32 model_i = 0;
+		while (geo_model)
+		{
+			model_names[model_i++] = geo_model->name;
+			geo_model = geo_model->next;
+		}
+
+		// read models from geo file
+		char geo_file_path[256];
+		string_concat(geo_file_path, sizeof(geo_file_path), geo_base_path, geo->relative_file_path);
+
+		File_Handle geo_file = file_open_read(geo_file_path);
+		geo_file_read(geo_file, model_names, current_model, model_count, model_allocator, &geo_temp_allocator);
+		current_model += model_count;
+		file_close(geo_file);
+		
+		// convert instance position/rotation 
+		geo_model = geo->models;
+		while (geo_model)
+		{
+			*current_model_instances = {};
+
+			Model_Instance* instance = geo_model->instances;
+			while (instance)
+			{
+				++current_model_instances->transform_count;
+				instance = instance->next;
+			}
+
+			current_model_instances->transforms = (Matrix_4x4*)linear_allocator_alloc(model_instance_allocator, sizeof(Matrix_4x4) * current_model_instances->transform_count);
+
+			Matrix_4x4* current_transform = current_model_instances->transforms;
+			instance = geo_model->instances;
+			while (instance)
+			{
+				matrix_4x4_transform(current_transform, instance->position, instance->rotation);
+				++current_transform;
+
+				instance = instance->next;
+			}
+
+			++current_model_instances;
+
+			geo_model = geo_model->next;
+		}
+
+		geo = geo->next;
+	}
+
+	*out_model_count = total_model_count;
+	*out_model_instances = model_instances;
+	*/
 
 	const uint32 matrix_count = num_objects_in_scene > 0 ? num_objects_in_scene : 1025;
 	const uint32 ubo_size = matrix_count * 4 * 4 * sizeof(float32);
