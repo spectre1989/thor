@@ -8,6 +8,10 @@
 
 
 
+constexpr int32 c_bytes_per_transform = sizeof(float32) * 4 * 4;
+
+
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
     VkDebugReportFlagsEXT                       flags,
     VkDebugReportObjectTypeEXT                  /*object_type*/,
@@ -143,7 +147,7 @@ static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, in
 	indices[index_offset++] = uint16(vertex_offset + 2);
 }
 
-void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, Geo* geos, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
+void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, int32 model_count, Model* models, int32* instance_count, Transform** instances, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
 
@@ -484,67 +488,66 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &depth_buffer_image_view);
 	assert(result == VK_SUCCESS);
 
-	struct UBO
-	{
-		struct Model
-		{
-			Geo_Model* geo_model;
-			Model* next;
-		};
+	int32 max_transforms_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_bytes_per_transform;
 
-		Matrix_4x4* transforms;
-		int32 transform_count;
-		Model* models_head;
-		Model* models_tail;
-		UBO* next;
-	};
+	int32 total_transform_count = 0;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
+	{
+		total_transform_count += instance_count[model_i];
+	}
+
+	Matrix_4x4* transforms = (Matrix_4x4*)linear_allocator_alloc(allocator, sizeof(Matrix_4x4) * total_transform_count);
 	
-	UBO* ubo = nullptr;
-	constexpr int32 c_ubo_size_per_transform = sizeof(float32) * 4 * 4;
-	int32 max_transforms_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_ubo_size_per_transform;
-
-	Geo* geo = geos;
-	while (geo)
+	Matrix_4x4* transform_iter = transforms;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
 	{
-		Geo_Model* model = geo->models;
-		while (model)
+		for (int32 instance_i = 0; instance_i < instance_count[model_i]; ++instance_i)
 		{
-			Model_Instance* instance = model->instances;
-			while (instance)
-			{
-				if (!ubo || ubo->transform_count == max_transforms_per_ubo)
-				{
-					UBO* new_ubo = (UBO*)linear_allocator_alloc(temp_allocator, sizeof(UBO));
-					*new_ubo = {};
-					new_ubo->transforms = (Matrix_4x4*)linear_allocator_alloc(allocator, sizeof(Matrix_4x4) * max_transforms_per_ubo);
-
-					new_ubo->next = ubo;
-					ubo = new_ubo;
-				}
-
-				matrix_4x4_transform(&ubo->transforms[ubo->transform_count], instance->position, instance->rotation);
-				++ubo->transform_count;
-
-				instance = instance->next;
-			}
-			
-			UBO::Model* ubo_model = (UBO::Model*)linear_allocator_alloc(temp_allocator, sizeof(UBO::Model));
-			*ubo_model = {};
-			ubo_model->geo_model = model;
-			if (ubo->models_tail)
-			{
-				ubo->models_tail->next = ubo_model;
-				ubo->models_tail = ubo_model;
-			}
-			else
-			{
-				ubo->models_head = ubo_model;
-				ubo->models_tail = ubo_model;
-			}
-
-			model = model->next;
+			matrix_4x4_transform(transform_iter, instances[model_i][instance_i].position, instances[model_i][instance_i].rotation);
+			++transform_iter;
 		}
 	}
+
+	int32 ubo_count = (total_transform_count / max_transforms_per_ubo) + (total_transform_count % max_transforms_per_ubo ? 1 : 0);
+	
+	graphics_state->ubos = (UBO*)linear_allocator_alloc(allocator, sizeof(UBO) * ubo_count);
+	graphics_state->ubo_count = ubo_count;
+
+	int32 model_i = 0;
+	int32 instances_remaining = instance_count[model_i];
+	for (int32 ubo_i = 0; ubo_i < ubo_count; ++ubo_i)
+	{
+		UBO* ubo = &graphics_state->ubos[ubo_i];
+		*ubo = {};
+
+		ubo->world_transforms = &transforms[ubo_i * max_transforms_per_ubo];
+
+		int32 space_in_ubo = max_transforms_per_ubo;
+		while (space_in_ubo)
+		{
+			UBO::Model_Info* model_info = (UBO::Model_Info*)linear_allocator_alloc(allocator, sizeof(UBO::Model_Info));
+			
+			model_info->instance_count = i32_min(space_in_ubo, instances_remaining);
+			// todo(jbr) vertex buffer, index buffer, index count
+
+			++ubo->model_count;
+			ubo->transform_count += model_info->instance_count;
+
+			space_in_ubo -= model_info->instance_count;
+			instances_remaining -= model_info->instance_count;
+
+			if (!instances_remaining)
+			{
+				++model_i;
+				assert(model_i < ubo->model_count);
+				instances_remaining = instance_count[model_i];
+			}
+		}
+
+		// todo(jbr) device_memory_offset, descriptor_set
+	}
+	
+
 
 	/* 
 	old shit that used to be in geobin loading 
@@ -644,10 +647,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	*out_model_count = total_model_count;
 	*out_model_instances = model_instances;
 	*/
-
-	const uint32 matrix_count = num_objects_in_scene > 0 ? num_objects_in_scene : 1025;
-	const uint32 ubo_size = matrix_count * 4 * 4 * sizeof(float32);
-
+	
 	VkBuffer uniform_buffer;
 	create_buffer(graphics_state->device, 
 		&gpu_memory_properties, 
@@ -1131,24 +1131,52 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-		vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, /*first_set*/ 0, /*set_count*/ 1, &descriptor_set, /*dynamic_offset_count*/ 0, /*dynamic_offsets*/ nullptr);
-
-		VkDeviceSize offset = 0;
-		vkCmdBindVertexBuffers(command_buffer, /*first_binding*/ 0, /*binding_count*/ 1, &vertex_buffer, &offset);
-
-		vkCmdBindIndexBuffer(command_buffer, index_buffer, /*offset*/ 0, VK_INDEX_TYPE_UINT16);
-
-		for (int32 object_i = 0; object_i < num_objects_in_scene; ++object_i)
+		for (int32 ubo_i = 0; ubo_i < graphics_state->ubo_count; ++ubo_i)
 		{
-			vkCmdPushConstants(
-				command_buffer,
-				pipeline_layout,
-				VK_SHADER_STAGE_VERTEX_BIT,
-				/*offset*/ 0,
-				sizeof(int32),
-				&object_i);
+			UBO* ubo = &graphics_state->ubos[ubo_i];
 
-			vkCmdDrawIndexed(command_buffer, c_index_count, /*instance_count*/ 1, /*first_index*/ 0, /*vertex_offset*/ 0, /*first_instance*/ 0);
+			vkCmdBindDescriptorSets(
+				command_buffer, 
+				VK_PIPELINE_BIND_POINT_GRAPHICS, 
+				pipeline_layout, 
+				/*first_set*/ 0, 
+				/*set_count*/ 1, 
+				&ubo->descriptor_set, 
+				/*dynamic_offset_count*/ 0, 
+				/*dynamic_offsets*/ nullptr);
+
+			int32 global_instance_i = 0; // used for push constant which increases across models
+			for (int32 model_i = 0; model_i < ubo->model_count; ++model_i)
+			{
+				UBO::Model_Info* model_info = &ubo->models[model_i];
+
+				VkDeviceSize offset = 0;
+				vkCmdBindVertexBuffers(command_buffer, /*first_binding*/ 0, /*binding_count*/ 1, &model_info->vertex_buffer, &offset);
+
+				vkCmdBindIndexBuffer(command_buffer, model_info->index_buffer, /*offset*/ 0, VK_INDEX_TYPE_UINT16);
+
+				for (int32 instance_i = 0; instance_i < model_info->instance_count; ++instance_i)
+				{
+					vkCmdPushConstants(
+						command_buffer,
+						pipeline_layout,
+						VK_SHADER_STAGE_VERTEX_BIT,
+						/*offset*/ 0,
+						sizeof(int32),
+						&global_instance_i);
+
+					vkCmdDrawIndexed(
+						command_buffer, 
+						model_info->index_count, 
+						/*instance_count*/ 1, 
+						/*first_index*/ 0, 
+						/*vertex_offset*/ 0, 
+						/*first_instance*/ 0);
+					
+					++global_instance_i;
+				}
+			}
+			
 		}
 
 		vkCmdEndRenderPass(command_buffer);
@@ -1172,25 +1200,37 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	vkCreateSemaphore(graphics_state->device, &semaphore_info, /*allocator*/ nullptr, &graphics_state->semaphore);
 }
 
-void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix, Matrix_4x4* object_matrices, int32 num_objects)
+void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix)
 {
 	Matrix_4x4 view_projection_matrix;
 	matrix_4x4_mul(&view_projection_matrix, &graphics_state->projection_matrix, view_matrix);
 
-	float* ubo_data;
-	VkResult result = vkMapMemory(graphics_state->device, graphics_state->uniform_buffer_memory, /*offset*/ 0, sizeof(float32) * 16 * num_objects, /*flags*/ 0, (void**)&ubo_data);
-	assert(result == VK_SUCCESS);
-
-	for (int32 i = 0; i < num_objects; ++i)
+	UBO* ubos_end = &graphics_state->ubos[graphics_state->ubo_count];
+	for (UBO* ubo = graphics_state->ubos; ubo != ubos_end; ++ubo)
 	{
-		Matrix_4x4* mvp_matrix = (Matrix_4x4*)&ubo_data[16 * i];
-		matrix_4x4_mul(mvp_matrix, &view_projection_matrix, &object_matrices[i]);
+		Matrix_4x4* dst_transforms;
+		VkResult result = vkMapMemory(
+			graphics_state->device, 
+			graphics_state->ubo_device_memory, 
+			ubo->device_memory_offset, 
+			ubo->transform_count * c_bytes_per_transform, 
+			/*flags*/ 0, 
+			(void**)&dst_transforms);
+		assert(result == VK_SUCCESS);
+
+		Matrix_4x4* src_transform = ubo->world_transforms;
+		Matrix_4x4* dst_transform = dst_transforms;
+		Matrix_4x4* dst_transforms_end = &dst_transforms[ubo->transform_count];
+		for (; dst_transform != dst_transforms_end; ++src_transform, ++dst_transform)
+		{
+			matrix_4x4_mul(dst_transform, &view_projection_matrix, src_transform);
+		}
+
+		vkUnmapMemory(graphics_state->device, graphics_state->ubo_device_memory);
 	}
 
-	vkUnmapMemory(graphics_state->device, graphics_state->uniform_buffer_memory);
-
 	uint32 image_index;
-	result = vkAcquireNextImageKHR(graphics_state->device, graphics_state->swapchain, /*timeout*/ (uint64)-1, graphics_state->semaphore, /*fence*/ nullptr, &image_index);
+	VkResult result = vkAcquireNextImageKHR(graphics_state->device, graphics_state->swapchain, /*timeout*/ (uint64)-1, graphics_state->semaphore, /*fence*/ nullptr, &image_index);
 	assert(result == VK_SUCCESS);
 
 	VkSubmitInfo submit_info = {};
