@@ -13,32 +13,19 @@ constexpr uint32 c_bin_defnames_type_id = 0x0c027625;
 
 
 
-struct Model_Instance
-{
-	Vec_3f position;
-	Quat rotation;
-	Model_Instance* next;
-};
-
-struct Geo_Model
-{
-	const char* name;
-	Model_Instance* instances;
-	Geo_Model* next;
-};
-
-struct Geo
-{
-	const char* relative_file_path;
-	Geo_Model* models;
-	Geo* next;
-};
-
-
-
 /**
  * check a bin file can be successfully parsed
  */
 void bin_file_check(File_Handle file);
 
-void geobin_file_read(File_Handle file, const char* relative_geobin_file_path, const char* coh_data_path, struct Linear_Allocator* model_allocator, int32* out_model_count, struct Model_Instances** out_model_instances, Linear_Allocator* model_instance_allocator, Linear_Allocator* temp_allocator);
+void geobin_file_read(
+	File_Handle file, 
+	const char* relative_geobin_file_path, 
+	const char* coh_data_path, 
+	int32* out_model_count, 
+	struct Model** out_models, 
+	int32** out_model_instance_count, 
+	Transform*** out_model_instances, 
+	struct Linear_Allocator* model_allocator, // out_models allocated from here
+	Linear_Allocator* instance_allocator, // out_instance_count/out_instances allocated from here
+	Linear_Allocator* temp_allocator); // scratch space

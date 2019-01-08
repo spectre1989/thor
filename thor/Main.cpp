@@ -112,10 +112,6 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	Linear_Allocator permanent_allocator;
 	linear_allocator_create_sub_allocator(&allocator, &permanent_allocator, megabytes(32));
 
-	constexpr int32 c_max_objects_in_scene = 1024;
-	Matrix_4x4* matrices = nullptr;
-	int32 num_objects_in_scene = 0;
-
 	assert(string_length(cmd_line))
 	
 	Linear_Allocator allocator_snapshot = allocator; // use this to restore allocator later
@@ -134,16 +130,39 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 	linear_allocator_create_sub_allocator(&allocator, &temp_allocator);
 
 	int32 model_count;
-	Model_Instances* model_instances;
+	Model* models;
+	int32* model_instance_count;
+	Transform** model_instances;
 
 	File_Handle geobin_file = file_open_read(geobin_file_path);
-	geobin_file_read(geobin_file, "maps/City_Zones/City_01_01/City_01_01.bin", coh_data_path, &permanent_allocator /*model_allocator*/, &model_count, &model_instances, &model_instance_allocator, &temp_allocator);
+	geobin_file_read(
+		geobin_file, 
+		"maps/City_Zones/City_01_01/City_01_01.bin", 
+		coh_data_path,
+		&model_count,
+		&models,
+		&model_instance_count,
+		&model_instances,
+		/*model_allocator*/ &permanent_allocator, // todo(jbr) models don't need to be permanent, can just put it all in a "not quite as temp as temp" allocator
+		&model_instance_allocator, 
+		&temp_allocator);
 	file_close(geobin_file);
 
 	linear_allocator_reset(&temp_allocator);
 
 	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&permanent_allocator, sizeof(Graphics_State));
-	graphics_init(graphics_state, instance_handle, window_handle, c_window_width, c_window_height, num_objects_in_scene, &permanent_allocator, &temp_allocator);
+	graphics_init(
+		graphics_state, 
+		instance_handle, 
+		window_handle, 
+		c_window_width, 
+		c_window_height,
+		model_count,
+		models,
+		model_instance_count,
+		model_instances,
+		&permanent_allocator,
+		&temp_allocator);
 
 	// now throw away all allocators after permanent allocator
 	allocator = allocator_snapshot;
@@ -247,7 +266,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		Matrix_4x4 view_matrix;
 		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, camera_up, camera_right);
 
-		graphics_draw(graphics_state, &view_matrix, matrices, num_objects_in_scene);
+		graphics_draw(graphics_state, &view_matrix);
 
 		// wait for end of frame
 		LARGE_INTEGER now;

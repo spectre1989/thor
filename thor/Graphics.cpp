@@ -72,13 +72,29 @@ static VkShaderModule create_shader_module(VkDevice device, const char* shader_f
 	return shader_module;
 }
 
-static void create_buffer(VkDevice device, 
-	VkPhysicalDeviceMemoryProperties* gpu_memory_properties, 
+static VkDeviceMemory create_buffer_memory(
+	VkDevice device, 
 	VkDeviceSize size, 
-	VkBufferUsageFlags usage_flags, 
-	VkMemoryPropertyFlags required_memory_properties,
-	VkBuffer* out_buffer,
-	VkDeviceMemory* out_buffer_memory)
+	uint32 memory_type_index)
+{
+	VkMemoryAllocateInfo mem_alloc_info = {};
+	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	mem_alloc_info.pNext = nullptr;
+	mem_alloc_info.allocationSize = size;
+	mem_alloc_info.memoryTypeIndex = memory_type_index;
+	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
+
+	VkDeviceMemory buffer_memory;
+	VkResult result = vkAllocateMemory(device, &mem_alloc_info, /*allocator*/ nullptr, &buffer_memory);
+	assert(result == VK_SUCCESS);
+
+	return buffer_memory;
+}
+
+static VkBuffer create_buffer(
+	VkDevice device, 
+	VkDeviceSize size,
+	VkBufferUsageFlags usage_flags)
 {
 	VkBufferCreateInfo buffer_info = {};
 	buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -94,60 +110,21 @@ static void create_buffer(VkDevice device,
 	VkResult result = vkCreateBuffer(device, &buffer_info, /*allocator*/ nullptr, &buffer);
 	assert(result == VK_SUCCESS);
 
-	VkMemoryRequirements memory_requirements;
-	vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
-
-	VkMemoryAllocateInfo mem_alloc_info = {};
-	mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	mem_alloc_info.pNext = nullptr;
-	mem_alloc_info.allocationSize = memory_requirements.size;
-	mem_alloc_info.memoryTypeIndex = get_memory_type_index(gpu_memory_properties, memory_requirements.memoryTypeBits, required_memory_properties);
-	assert(mem_alloc_info.memoryTypeIndex != (uint32)-1);
-
-	VkDeviceMemory buffer_memory;
-	result = vkAllocateMemory(device, &mem_alloc_info, /*allocator*/ nullptr, &buffer_memory);
-	assert(result == VK_SUCCESS);
-
-	result = vkBindBufferMemory(device, buffer, buffer_memory, /*offset*/ 0);
-	assert(result == VK_SUCCESS);
-
-	*out_buffer = buffer;
-	*out_buffer_memory = buffer_memory;
+	return buffer;
 }
 
-static void create_quad(Vec_3f pos, Vec_3f right, Vec_3f up, float* vertices, int32 vertex_offset, uint16* indices, int32 index_offset)
-{
-	Vec_3f half_size = vec_3f_mul(vec_3f_add(right, up), 0.5f);
-
-	Vec_3f bottom_left = vec_3f_add(pos, vec_3f_mul(half_size, -1.0f));
-	Vec_3f top_left = vec_3f_add(bottom_left, up);
-	Vec_3f top_right = vec_3f_add(top_left, right);
-	Vec_3f bottom_right = vec_3f_add(bottom_left, right);
-
-	int32 vertex_i = vertex_offset * 3;
-
-	vertices[vertex_i++] = bottom_left.x;
-	vertices[vertex_i++] = bottom_left.y;
-	vertices[vertex_i++] = bottom_left.z;
-	vertices[vertex_i++] = top_left.x;
-	vertices[vertex_i++] = top_left.y;
-	vertices[vertex_i++] = top_left.z;
-	vertices[vertex_i++] = top_right.x;
-	vertices[vertex_i++] = top_right.y;
-	vertices[vertex_i++] = top_right.z;
-	vertices[vertex_i++] = bottom_right.x;
-	vertices[vertex_i++] = bottom_right.y;
-	vertices[vertex_i++] = bottom_right.z;
-
-	indices[index_offset++] = uint16(vertex_offset);
-	indices[index_offset++] = uint16(vertex_offset + 2);
-	indices[index_offset++] = uint16(vertex_offset + 1);
-	indices[index_offset++] = uint16(vertex_offset);
-	indices[index_offset++] = uint16(vertex_offset + 3);
-	indices[index_offset++] = uint16(vertex_offset + 2);
-}
-
-void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HWND window_handle, uint32 width, uint32 height, int32 model_count, Model* models, int32* instance_count, Transform** instances, Linear_Allocator* allocator, Linear_Allocator* temp_allocator)
+void graphics_init(
+	Graphics_State* graphics_state,
+	HINSTANCE instance_handle, 
+	HWND window_handle, 
+	uint32 width, 
+	uint32 height, 
+	int32 model_count,
+	Model* models, 
+	int32* model_instance_count, 
+	Transform** model_instances, 
+	Linear_Allocator* allocator, 
+	Linear_Allocator* temp_allocator)
 {
 	*graphics_state = {};
 
@@ -488,175 +465,6 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	result = vkCreateImageView(graphics_state->device, &image_view_info, /*allocator*/ nullptr, &depth_buffer_image_view);
 	assert(result == VK_SUCCESS);
 
-	int32 max_transforms_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_bytes_per_transform;
-
-	int32 total_transform_count = 0;
-	for (int32 model_i = 0; model_i < model_count; ++model_i)
-	{
-		total_transform_count += instance_count[model_i];
-	}
-
-	Matrix_4x4* transforms = (Matrix_4x4*)linear_allocator_alloc(allocator, sizeof(Matrix_4x4) * total_transform_count);
-	
-	Matrix_4x4* transform_iter = transforms;
-	for (int32 model_i = 0; model_i < model_count; ++model_i)
-	{
-		for (int32 instance_i = 0; instance_i < instance_count[model_i]; ++instance_i)
-		{
-			matrix_4x4_transform(transform_iter, instances[model_i][instance_i].position, instances[model_i][instance_i].rotation);
-			++transform_iter;
-		}
-	}
-
-	int32 ubo_count = (total_transform_count / max_transforms_per_ubo) + (total_transform_count % max_transforms_per_ubo ? 1 : 0);
-	
-	graphics_state->ubos = (UBO*)linear_allocator_alloc(allocator, sizeof(UBO) * ubo_count);
-	graphics_state->ubo_count = ubo_count;
-
-	int32 model_i = 0;
-	int32 instances_remaining = instance_count[model_i];
-	for (int32 ubo_i = 0; ubo_i < ubo_count; ++ubo_i)
-	{
-		UBO* ubo = &graphics_state->ubos[ubo_i];
-		*ubo = {};
-
-		ubo->world_transforms = &transforms[ubo_i * max_transforms_per_ubo];
-
-		int32 space_in_ubo = max_transforms_per_ubo;
-		while (space_in_ubo)
-		{
-			UBO::Model_Info* model_info = (UBO::Model_Info*)linear_allocator_alloc(allocator, sizeof(UBO::Model_Info));
-			
-			model_info->instance_count = i32_min(space_in_ubo, instances_remaining);
-			// todo(jbr) vertex buffer, index buffer, index count
-
-			++ubo->model_count;
-			ubo->transform_count += model_info->instance_count;
-
-			space_in_ubo -= model_info->instance_count;
-			instances_remaining -= model_info->instance_count;
-
-			if (!instances_remaining)
-			{
-				++model_i;
-				assert(model_i < ubo->model_count);
-				instances_remaining = instance_count[model_i];
-			}
-		}
-
-		// todo(jbr) device_memory_offset, descriptor_set
-	}
-	
-
-
-	/* 
-	old shit that used to be in geobin loading 
-	
-	char geo_base_path[256];
-	string_concat(geo_base_path, sizeof(geo_base_path), coh_data_path, "/");
-
-	int32 total_model_count = 0;
-	Geo* geo = geos;
-	while (geo)
-	{
-		Geo_Model* geo_model = geo->models;
-		while (geo_model)
-		{
-			++total_model_count;
-
-			geo_model = geo_model->next;
-		}
-
-		geo = geo->next;
-	}
-
-	Model* models = (Model*)linear_allocator_alloc(model_allocator, sizeof(Model) * total_model_count);
-	Model_Instances* model_instances = (Model_Instances*)linear_allocator_alloc(model_instance_allocator, sizeof(Model_Instances) * total_model_count);
-	
-	// as we go write models/model instances here
-	Model* current_model = models;
-	Model_Instances* current_model_instances = model_instances;
-	
-	geo = geos;
-	while (geo)
-	{
-		// reset the geo temp allocator for each file
-		Linear_Allocator geo_temp_allocator = *temp_allocator;
-
-		// count the models we want from this geo so we can make an array of model names
-		Geo_Model* geo_model = geo->models;
-		int32 model_count = 0;
-		while (geo_model)
-		{
-			++model_count;
-			geo_model = geo_model->next;
-		}
-
-		// make array of model names
-		const char** model_names = (const char**)linear_allocator_alloc(&geo_temp_allocator, sizeof(const char*) * model_count);
-		geo_model = geo->models;
-		int32 model_i = 0;
-		while (geo_model)
-		{
-			model_names[model_i++] = geo_model->name;
-			geo_model = geo_model->next;
-		}
-
-		// read models from geo file
-		char geo_file_path[256];
-		string_concat(geo_file_path, sizeof(geo_file_path), geo_base_path, geo->relative_file_path);
-
-		File_Handle geo_file = file_open_read(geo_file_path);
-		geo_file_read(geo_file, model_names, current_model, model_count, model_allocator, &geo_temp_allocator);
-		current_model += model_count;
-		file_close(geo_file);
-		
-		// convert instance position/rotation 
-		geo_model = geo->models;
-		while (geo_model)
-		{
-			*current_model_instances = {};
-
-			Model_Instance* instance = geo_model->instances;
-			while (instance)
-			{
-				++current_model_instances->transform_count;
-				instance = instance->next;
-			}
-
-			current_model_instances->transforms = (Matrix_4x4*)linear_allocator_alloc(model_instance_allocator, sizeof(Matrix_4x4) * current_model_instances->transform_count);
-
-			Matrix_4x4* current_transform = current_model_instances->transforms;
-			instance = geo_model->instances;
-			while (instance)
-			{
-				matrix_4x4_transform(current_transform, instance->position, instance->rotation);
-				++current_transform;
-
-				instance = instance->next;
-			}
-
-			++current_model_instances;
-
-			geo_model = geo_model->next;
-		}
-
-		geo = geo->next;
-	}
-
-	*out_model_count = total_model_count;
-	*out_model_instances = model_instances;
-	*/
-	
-	VkBuffer uniform_buffer;
-	create_buffer(graphics_state->device, 
-		&gpu_memory_properties, 
-		ubo_size, 
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-		&uniform_buffer, 
-		&graphics_state->uniform_buffer_memory);
-
 	VkDescriptorSetLayoutBinding layout_binding = {};
 	layout_binding.binding = 0;
 	layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -692,16 +500,174 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	VkPipelineLayout pipeline_layout;
 	result = vkCreatePipelineLayout(graphics_state->device, &pipeline_layout_info, /*allocator*/ nullptr, &pipeline_layout);
 	assert(result == VK_SUCCESS);
+	
+	constexpr int32 c_float32_count_per_vertex = 3;
+	constexpr int32 c_bytes_per_vertex = c_float32_count_per_vertex * sizeof(float32);
+	constexpr int32 c_bytes_per_index = sizeof(uint32);
+	constexpr int32 c_bytes_per_triangle = c_bytes_per_index * 3;
 
+	VkBuffer* vertex_buffers = (VkBuffer*)linear_allocator_alloc(temp_allocator, sizeof(VkBuffer) * model_count); // todo(jbr) multiple vbos/ibos in one VkBuffer
+	VkBuffer* index_buffers = (VkBuffer*)linear_allocator_alloc(temp_allocator, sizeof(VkBuffer) * model_count);
+	VkDeviceSize total_buffer_memory_size = 0;
+	uint32 supported_memory_type_bits = (uint32)-1;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
+	{
+		vertex_buffers[model_i] = create_buffer(graphics_state->device, models[model_i].vertex_count * c_bytes_per_vertex, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+		index_buffers[model_i] = create_buffer(graphics_state->device, models[model_i].triangle_count * c_bytes_per_triangle, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+		VkMemoryRequirements memory_requirements;
+		vkGetBufferMemoryRequirements(graphics_state->device, vertex_buffers[model_i], &memory_requirements);
+		total_buffer_memory_size += memory_requirements.size;
+		supported_memory_type_bits &= memory_requirements.memoryTypeBits;
+		vkGetBufferMemoryRequirements(graphics_state->device, index_buffers[model_i], &memory_requirements);
+		total_buffer_memory_size += memory_requirements.size;
+		supported_memory_type_bits &= memory_requirements.memoryTypeBits;
+	}
+
+	VkDeviceMemory mesh_buffer_memory = create_buffer_memory(
+		graphics_state->device,
+		total_buffer_memory_size,
+		get_memory_type_index(
+			&gpu_memory_properties, 
+			supported_memory_type_bits, 
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+	
+	VkDeviceSize mesh_buffer_memory_offset = 0;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
+	{
+		result = vkBindBufferMemory(graphics_state->device, vertex_buffers[model_i], mesh_buffer_memory, mesh_buffer_memory_offset);
+		assert(result == VK_SUCCESS);
+
+		float* vbo_data;
+		int32 vbo_size = models[model_i].vertex_count * c_bytes_per_vertex;
+		result = vkMapMemory(graphics_state->device, mesh_buffer_memory, mesh_buffer_memory_offset, vbo_size, /*flags*/ 0, (void**)&vbo_data);
+		assert(result == VK_SUCCESS);
+		memcpy(vbo_data, models[model_i].vertices, vbo_size);
+		vkUnmapMemory(graphics_state->device, mesh_buffer_memory);
+
+		VkMemoryRequirements memory_requirements;
+		vkGetBufferMemoryRequirements(graphics_state->device, vertex_buffers[model_i], &memory_requirements);
+		mesh_buffer_memory_offset += memory_requirements.size;
+
+		result = vkBindBufferMemory(graphics_state->device, index_buffers[model_i], mesh_buffer_memory, /*offset*/ mesh_buffer_memory_offset);
+		assert(result == VK_SUCCESS);
+
+		uint32* ibo_data;
+		int32 ibo_size = models[model_i].triangle_count * c_bytes_per_triangle;
+		result = vkMapMemory(graphics_state->device, mesh_buffer_memory, mesh_buffer_memory_offset, ibo_size, /*flags*/ 0, (void**)&ibo_data);
+		assert(result == VK_SUCCESS);
+		memcpy(ibo_data, models[model_i].triangles, ibo_size);
+		vkUnmapMemory(graphics_state->device, mesh_buffer_memory);
+
+		vkGetBufferMemoryRequirements(graphics_state->device, index_buffers[model_i], &memory_requirements);
+		mesh_buffer_memory_offset += memory_requirements.size;
+	}
+
+	int32 max_transforms_per_ubo = gpu_properties.limits.maxUniformBufferRange / c_bytes_per_transform;
+
+	int32 total_transform_count = 0;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
+	{
+		total_transform_count += model_instance_count[model_i];
+	}
+
+	Matrix_4x4* transforms = (Matrix_4x4*)linear_allocator_alloc(allocator, sizeof(Matrix_4x4) * total_transform_count);
+	
+	Matrix_4x4* transform_iter = transforms;
+	for (int32 model_i = 0; model_i < model_count; ++model_i)
+	{
+		for (int32 instance_i = 0; instance_i < model_instance_count[model_i]; ++instance_i)
+		{
+			matrix_4x4_transform(transform_iter, model_instances[model_i][instance_i].position, model_instances[model_i][instance_i].rotation);
+			++transform_iter;
+		}
+	}
+
+	graphics_state->object_transforms = transforms;
+	graphics_state->object_count = total_transform_count;
+
+	int32 ubo_count = (total_transform_count / max_transforms_per_ubo) + (total_transform_count % max_transforms_per_ubo ? 1 : 0);
+	
+	graphics_state->ubos = (UBO*)linear_allocator_alloc(allocator, sizeof(UBO) * ubo_count);
+	graphics_state->ubo_count = ubo_count;
+
+	VkBuffer* ubo_buffers = (VkBuffer*)linear_allocator_alloc(temp_allocator, sizeof(VkBuffer) * ubo_count);
+
+	total_buffer_memory_size = 0;
+	supported_memory_type_bits = (uint32)-1;
+
+	int32 model_i = 0;
+	int32 instances_remaining = model_instance_count[model_i];
+	for (int32 ubo_i = 0; ubo_i < ubo_count; ++ubo_i)
+	{
+		UBO* ubo = &graphics_state->ubos[ubo_i];
+		*ubo = {};
+
+		ubo->world_transforms = &transforms[ubo_i * max_transforms_per_ubo];
+
+		int32 space_in_ubo = max_transforms_per_ubo;
+		while (space_in_ubo)
+		{
+			UBO::Model_Info* model_info = (UBO::Model_Info*)linear_allocator_alloc(allocator, sizeof(UBO::Model_Info));
+			if (!ubo->models)
+			{
+				ubo->models = model_info;
+			}
+
+			model_info->instance_count = i32_min(space_in_ubo, instances_remaining);
+			model_info->model_index = model_i;
+
+			++ubo->model_count;
+			ubo->transform_count += model_info->instance_count;
+
+			space_in_ubo -= model_info->instance_count;
+			instances_remaining -= model_info->instance_count;
+
+			if (!instances_remaining)
+			{
+				++model_i;
+				if (model_i == model_count)
+				{
+					break;
+				}
+				instances_remaining = model_instance_count[model_i];
+			}
+		}
+
+		ubo_buffers[ubo_i] = create_buffer(graphics_state->device, ubo->transform_count * c_bytes_per_transform, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+		VkMemoryRequirements memory_requirements;
+		vkGetBufferMemoryRequirements(graphics_state->device, ubo_buffers[ubo_i], &memory_requirements);
+
+		VkDeviceSize bytes_misaligned = total_buffer_memory_size % memory_requirements.alignment;
+		if (bytes_misaligned)
+		{
+			total_buffer_memory_size += (memory_requirements.alignment - bytes_misaligned);
+		}
+		ubo->device_memory_offset = total_buffer_memory_size;
+		total_buffer_memory_size += memory_requirements.size;
+		supported_memory_type_bits &= memory_requirements.memoryTypeBits;
+	}
+
+	VkDeviceMemory ubo_device_memory = create_buffer_memory(
+		graphics_state->device, 
+		total_buffer_memory_size, 
+		get_memory_type_index(
+			&gpu_memory_properties, 
+			supported_memory_type_bits, 
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+
+	graphics_state->ubo_device_memory = ubo_device_memory;
+	
 	VkDescriptorPoolSize descriptor_pool_size = {};
 	descriptor_pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptor_pool_size.descriptorCount = 1;
+	descriptor_pool_size.descriptorCount = ubo_count;
 
 	VkDescriptorPoolCreateInfo descriptor_pool_info = {};
 	descriptor_pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	descriptor_pool_info.pNext = nullptr;
 	descriptor_pool_info.flags = 0;
-	descriptor_pool_info.maxSets = 1;
+	descriptor_pool_info.maxSets = ubo_count;
 	descriptor_pool_info.poolSizeCount = 1;
 	descriptor_pool_info.pPoolSizes = &descriptor_pool_size;
 
@@ -716,29 +682,36 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 	descriptor_set_alloc_info.descriptorSetCount = 1;
 	descriptor_set_alloc_info.pSetLayouts = &descriptor_set_layout;
 
-	VkDescriptorSet descriptor_set;
-	result = vkAllocateDescriptorSets(graphics_state->device, &descriptor_set_alloc_info, &descriptor_set);
-	assert(result == VK_SUCCESS);
-
-	VkDescriptorBufferInfo buffer_info = {};
-	buffer_info.buffer = uniform_buffer;
-	buffer_info.offset = 0;
-	buffer_info.range = ubo_size;
-
 	VkWriteDescriptorSet descriptor_set_write = {};
 	descriptor_set_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	descriptor_set_write.pNext = nullptr;
-	descriptor_set_write.dstSet = descriptor_set;
 	descriptor_set_write.dstBinding = 0;
 	descriptor_set_write.dstArrayElement = 0;
 	descriptor_set_write.descriptorCount = 1;
 	descriptor_set_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	descriptor_set_write.pImageInfo = nullptr;
-	descriptor_set_write.pBufferInfo = &buffer_info;
 	descriptor_set_write.pTexelBufferView = nullptr;
 
-	vkUpdateDescriptorSets(graphics_state->device, /*write_count*/ 1, &descriptor_set_write, /*copy_count*/ 0, /*copies*/ nullptr);
+	for (int32 ubo_i = 0; ubo_i < ubo_count; ++ubo_i)
+	{
+		UBO* ubo = &graphics_state->ubos[ubo_i];
+		result = vkBindBufferMemory(graphics_state->device, ubo_buffers[ubo_i], ubo_device_memory, ubo->device_memory_offset);
+		assert(result == VK_SUCCESS);
 
+		result = vkAllocateDescriptorSets(graphics_state->device, &descriptor_set_alloc_info, &ubo->descriptor_set);
+		assert(result == VK_SUCCESS);
+
+		VkDescriptorBufferInfo buffer_info = {};
+		buffer_info.buffer = ubo_buffers[ubo_i];
+		buffer_info.offset = 0;
+		buffer_info.range = ubo->transform_count * c_bytes_per_transform;
+
+		descriptor_set_write.dstSet = ubo->descriptor_set;
+		descriptor_set_write.pBufferInfo = &buffer_info;
+
+		vkUpdateDescriptorSets(graphics_state->device, /*write_count*/ 1, &descriptor_set_write, /*copy_count*/ 0, /*copies*/ nullptr);
+	}
+	
 	VkAttachmentDescription attachments[2];
 	attachments[0] = {};
 	attachments[0].flags = 0;
@@ -818,99 +791,6 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 		vkCreateFramebuffer(graphics_state->device, &framebuffer_info, /*allocator*/ nullptr, &framebuffers[i]);
 	}
-
-	constexpr int32 c_num_faces = 6;
-	constexpr int32 c_vertex_count = 4 * c_num_faces;
-	constexpr int32 c_float32_count_per_vertex = 3;
-	constexpr int32 c_vertex_float32_count = c_vertex_count * c_float32_count_per_vertex;
-	constexpr int32 c_vbo_size = c_vertex_float32_count * sizeof(float32);
-	constexpr int32 c_index_count = 6 * c_num_faces;
-	constexpr int32 c_ibo_size = c_index_count * sizeof(uint16);
-	
-	float32 vertices[c_vertex_float32_count];
-	uint16 indices[c_index_count];
-
-	int32 vertex_offset = 0;
-	int32 index_offset = 0;
-	// front face
-	create_quad(vec_3f(0.0f, -0.5f, 0.0f), // pos
-				vec_3f(1.0f, 0.0f, 0.0f),  // right
-				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indices, index_offset);
-	vertex_offset += 4;
-	index_offset += 6;
-
-	// back face
-	create_quad(vec_3f(0.0f, 0.5f, 0.0f), // pos
-				vec_3f(-1.0f, 0.0f, 0.0f),  // right
-				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indices, index_offset);
-	vertex_offset += 4;
-	index_offset += 6;
-
-	// left face
-	create_quad(vec_3f(-0.5f, 0.0f, 0.0f), // pos
-				vec_3f(0.0f, -1.0f, 0.0f),  // right
-				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indices, index_offset);
-	vertex_offset += 4;
-	index_offset += 6;
-
-	// left face
-	create_quad(vec_3f(0.5f, 0.0f, 0.0f), // pos
-				vec_3f(0.0f, 1.0f, 0.0f),  // right
-				vec_3f(0.0f, 0.0f, 1.0f),  // up
-				vertices, vertex_offset, indices, index_offset);
-	vertex_offset += 4;
-	index_offset += 6;
-
-	// top face
-	create_quad(vec_3f(0.0f, 0.0f, 0.5f), // pos
-				vec_3f(1.0f, 0.0f, 0.0f),  // right
-				vec_3f(0.0f, 1.0f, 0.0f),  // up
-				vertices, vertex_offset, indices, index_offset);
-	vertex_offset += 4;
-	index_offset += 6;
-
-	// bottom face
-	create_quad(vec_3f(0.0f, 0.0f, -0.5f), // pos
-				vec_3f(1.0f, 0.0f, 0.0f),  // right
-				vec_3f(0.0f, -1.0f, 0.0f),  // up
-				vertices, vertex_offset, indices, index_offset);
-	vertex_offset += 4;
-	index_offset += 6;
-
-	VkBuffer vertex_buffer;
-	VkDeviceMemory vertex_buffer_memory;
-	create_buffer(graphics_state->device,
-		&gpu_memory_properties,
-		c_vbo_size,
-		VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&vertex_buffer,
-		&vertex_buffer_memory);
-
-	float* vbo_data;
-	result = vkMapMemory(graphics_state->device, vertex_buffer_memory, /*offset*/ 0, c_vbo_size, /*flags*/ 0, (void**)&vbo_data);
-	assert(result == VK_SUCCESS);
-	memcpy(vbo_data, vertices, c_vbo_size);
-	vkUnmapMemory(graphics_state->device, vertex_buffer_memory);
-
-	VkBuffer index_buffer;
-	VkDeviceMemory index_buffer_memory;
-	create_buffer(graphics_state->device,
-		&gpu_memory_properties,
-		c_ibo_size,
-		VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		&index_buffer,
-		&index_buffer_memory);
-
-	uint16* ibo_data;
-	result = vkMapMemory(graphics_state->device, index_buffer_memory, /*offset*/ 0, c_ibo_size, /*flags*/ 0, (void**)&ibo_data);
-	assert(result == VK_SUCCESS);
-	memcpy(ibo_data, indices, c_ibo_size);
-	vkUnmapMemory(graphics_state->device, index_buffer_memory);
 
 	constexpr uint32 c_num_shader_stages = 2;
 	VkPipelineShaderStageCreateInfo shader_stage_info[c_num_shader_stages];
@@ -1146,14 +1026,14 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 				/*dynamic_offsets*/ nullptr);
 
 			int32 global_instance_i = 0; // used for push constant which increases across models
-			for (int32 model_i = 0; model_i < ubo->model_count; ++model_i)
+			for (model_i = 0; model_i < ubo->model_count; ++model_i)
 			{
 				UBO::Model_Info* model_info = &ubo->models[model_i];
 
 				VkDeviceSize offset = 0;
-				vkCmdBindVertexBuffers(command_buffer, /*first_binding*/ 0, /*binding_count*/ 1, &model_info->vertex_buffer, &offset);
+				vkCmdBindVertexBuffers(command_buffer, /*first_binding*/ 0, /*binding_count*/ 1, &vertex_buffers[model_info->model_index], &offset);
 
-				vkCmdBindIndexBuffer(command_buffer, model_info->index_buffer, /*offset*/ 0, VK_INDEX_TYPE_UINT16);
+				vkCmdBindIndexBuffer(command_buffer, index_buffers[model_info->model_index], /*offset*/ 0, VK_INDEX_TYPE_UINT32);
 
 				for (int32 instance_i = 0; instance_i < model_info->instance_count; ++instance_i)
 				{
@@ -1167,7 +1047,7 @@ void graphics_init(Graphics_State* graphics_state, HINSTANCE instance_handle, HW
 
 					vkCmdDrawIndexed(
 						command_buffer, 
-						model_info->index_count, 
+						models[model_info->model_index].triangle_count * 3, 
 						/*instance_count*/ 1, 
 						/*first_index*/ 0, 
 						/*vertex_offset*/ 0, 
