@@ -70,8 +70,5 @@ void matrix_4x4_mul(Matrix_4x4* result, Matrix_4x4* a, Matrix_4x4* b);
 Vec_3f matrix_4x4_mul_direction(Matrix_4x4* matrix, Vec_3f v);
 void matrix_4x4_camera(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_3f up, Vec_3f right);
 void matrix_4x4_lookat(Matrix_4x4* matrix, Vec_3f position, Vec_3f target, Vec_3f up);
-void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r);
-void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r);
-void matrix_4x4_rotation_z(Matrix_4x4* matrix, float32 r);
 void matrix_4x4_rotation(Matrix_4x4* matrix, Quat rotation);
 void matrix_4x4_transform(Matrix_4x4* matrix, Vec_3f position, Quat rotation); // for an object in world with position and rotation, equivalent to doing rotation, then position translation

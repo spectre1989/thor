@@ -868,7 +868,7 @@ void graphics_init(
 	rasterisation_state_info.rasterizerDiscardEnable = false;
 	rasterisation_state_info.polygonMode = VK_POLYGON_MODE_LINE;
 	rasterisation_state_info.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterisation_state_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	rasterisation_state_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	rasterisation_state_info.depthBiasEnable = false;
 	rasterisation_state_info.depthBiasConstantFactor = 0.0f;
 	rasterisation_state_info.depthBiasClamp = 0.0f;
@@ -953,7 +953,7 @@ void graphics_init(
 		/*fov_y*/ 60.0f * c_deg_to_rad,
 		/*aspect_ratio*/ swapchain_info.imageExtent.width / (float32)swapchain_info.imageExtent.height,
 		/*near_plane*/ 0.1f,
-		/*far_plane*/ 1000.0f);
+		/*far_plane*/ 10000.0f);
 
 	VkCommandPoolCreateInfo command_pool_info = {};
 	command_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

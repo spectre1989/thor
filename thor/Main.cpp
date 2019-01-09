@@ -205,28 +205,28 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			ClientToScreen(window_handle, &mouse_pos);
 			SetCursorPos(mouse_pos.x, mouse_pos.y);
 
-			constexpr float mouse_sensitivity = 0.005f;
+			constexpr float c_mouse_sensitivity = 0.005f;
 
 			int32 mouse_x_delta = g_input_state.mouse_x - mouse_x_on_mouse_down;
 			int32 mouse_y_delta = g_input_state.mouse_y - mouse_y_on_mouse_down;
 
-			camera_yaw -= mouse_x_delta * mouse_sensitivity;
-			camera_pitch -= mouse_y_delta * mouse_sensitivity;
+			camera_yaw -= mouse_x_delta * c_mouse_sensitivity;
+			camera_pitch -= mouse_y_delta * c_mouse_sensitivity;
 
-			constexpr float32 min_pitch = c_deg_to_rad * -85.0f;
-			constexpr float32 max_pitch = c_deg_to_rad * 85.0f;
-			camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
+			constexpr float32 c_min_pitch = c_deg_to_rad * -85.0f;
+			constexpr float32 c_max_pitch = c_deg_to_rad * 85.0f;
+			camera_pitch = f32_clamp(camera_pitch, c_min_pitch, c_max_pitch);
 		}
 		else
 		{
 			was_mouse_down = 0;
 		}
 		
-		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
+		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 1.0f, 0.0f), -camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), -camera_pitch)); // todo(jbr) need to switch maths to be left-handed!
 		
 		Vec_3f camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
-		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 0.0f, 1.0f));
-		Vec_3f camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
+		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
+		Vec_3f camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 0.0f, 1.0f));
 		
 		constexpr float32 c_camera_speed = 50.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
@@ -248,11 +248,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		}
 		if (g_input_state.keys['E'])
 		{
-			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f(0.0f, 0.0f, c_camera_speed));
+			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f(0.0f, c_camera_speed, 0.0f));
 		}
 		if (g_input_state.keys['Q'])
 		{
-			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, 0.0f, c_camera_speed));
+			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, c_camera_speed, 0.0f));
 		}
 		
 		target_camera_velocity = vec_3f_mul(vec_3f_normalised(target_camera_velocity), c_camera_speed);
