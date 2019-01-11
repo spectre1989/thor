@@ -222,7 +222,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			was_mouse_down = 0;
 		}
 		
-		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 1.0f, 0.0f), -camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), -camera_pitch)); // todo(jbr) need to switch maths to be left-handed!
+		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 1.0f, 0.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
 		
 		Vec_3f camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
 		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
@@ -248,11 +248,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		}
 		if (g_input_state.keys['E'])
 		{
-			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f(0.0f, c_camera_speed, 0.0f));
+			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f(0.0f, 1.0f, 0.0f));
 		}
 		if (g_input_state.keys['Q'])
 		{
-			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, c_camera_speed, 0.0f));
+			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, 1.0f, 0.0f));
 		}
 		
 		target_camera_velocity = vec_3f_mul(vec_3f_normalised(target_camera_velocity), c_camera_speed);
