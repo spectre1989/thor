@@ -162,8 +162,8 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			camera_yaw -= mouse_x_delta * mouse_sensitivity;
 			camera_pitch -= mouse_y_delta * mouse_sensitivity;
 
-			constexpr float32 min_pitch = c_deg_to_rad * -48.0f;
-			constexpr float32 max_pitch = c_deg_to_rad * 48.0f;
+			constexpr float32 min_pitch = c_deg_to_rad * -89.0f;
+			constexpr float32 max_pitch = c_deg_to_rad * 89.0f;
 			camera_pitch = f32_clamp(camera_pitch, min_pitch, max_pitch);
 		}
 		else
@@ -171,11 +171,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 			was_mouse_down = 0;
 		}
 		
-		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 0.0f, 1.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
+		Quat camera_rotation = quat_mul(quat_angle_axis(vec_3f(0.0f, 1.0f, 0.0f), camera_yaw), quat_angle_axis(vec_3f(1.0f, 0.0f, 0.0f), camera_pitch));
 		
 		Vec_3f camera_right = quat_mul(camera_rotation, vec_3f(1.0f, 0.0f, 0.0f));
-		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 0.0f, 1.0f));
-		Vec_3f camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
+		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
+		Vec_3f camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 0.0f, 1.0f));
 		
 		constexpr float32 c_camera_speed = 5.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
@@ -197,11 +197,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		}
 		if (g_input_state.keys['E'])
 		{
-			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f(0.0f, 0.0f, c_camera_speed));
+			target_camera_velocity = vec_3f_add(target_camera_velocity, vec_3f(0.0f, c_camera_speed, 0.0f));
 		}
 		if (g_input_state.keys['Q'])
 		{
-			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, 0.0f, c_camera_speed));
+			target_camera_velocity = vec_3f_sub(target_camera_velocity, vec_3f(0.0f, c_camera_speed, 0.0f));
 		}
 		
 		target_camera_velocity = vec_3f_mul(vec_3f_normalised(target_camera_velocity), c_camera_speed);
@@ -215,7 +215,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		Matrix_4x4 view_matrix;
 		matrix_4x4_camera(&view_matrix, camera_position, camera_forward, camera_up, camera_right);
 
-		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 5.0f, 0.0f));
+		graphics_draw(graphics_state, &view_matrix, /*cube_position*/ vec_3f(0.0f, 0.0f, 5.0f));
 
 		// wait for end of frame
 		LARGE_INTEGER now;

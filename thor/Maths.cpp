@@ -133,19 +133,19 @@ void matrix_4x4_projection(
 {
 	// create projection matrix
 	// Note: Vulkan NDC coordinates are top-left corner (-1, -1), z 0-1
-	// 1/(tan(fovx/2)*aspect)	0	0				0
-	// 0						0	-1/tan(fovy/2)	0
-	// 0						c2	0				c1
-	// 0						1	0				0
+	// 1/(tan(fovx/2)*aspect)	0				0	0
+	// 0						-1/tan(fovy/2)	0	0
+	// 0						0				c2	c1
+	// 0						0				1	0
 	// this is stored column major
 	// NDC Z = c1/w + c2
 	// c1 = (near*far)/(near-far)
 	// c2 = far/(far-near)
 	*matrix = {};
 	matrix->m11 = 1.0f / (tanf(fov_y * 0.5f) * aspect_ratio);
-	matrix->m32 = (far_plane / (far_plane - near_plane));
-	matrix->m42 = 1.0f;
-	matrix->m23 = -1.0f / tanf(fov_y * 0.5f);
+	matrix->m22 = -1.0f / tanf(fov_y * 0.5f);
+	matrix->m33 = (far_plane / (far_plane - near_plane));
+	matrix->m43 = 1.0f;
 	matrix->m34 = (near_plane * far_plane) / (near_plane - far_plane);
 }
 
@@ -166,72 +166,6 @@ void matrix_4x4_translation(Matrix_4x4* matrix, Vec_3f translation)
 	matrix->m14 = translation.x;
 	matrix->m24 = translation.y;
 	matrix->m34 = translation.z;
-	matrix->m44 = 1.0f;
-}
-
-void matrix_4x4_rotation_x(Matrix_4x4* matrix, float32 r)
-{
-	float32 cr = cosf(r);
-	float32 sr = sinf(r);
-	matrix->m11 = 1.0f;
-	matrix->m21 = 0.0f;
-	matrix->m31 = 0.0f;
-	matrix->m41 = 0.0f;
-	matrix->m12 = 0.0f;
-	matrix->m22 = cr;
-	matrix->m32 = sr;
-	matrix->m42 = 0.0f;
-	matrix->m13 = 0.0f;
-	matrix->m23 = -sr;
-	matrix->m33 = cr;
-	matrix->m43 = 0.0f;
-	matrix->m14 = 0.0f;
-	matrix->m24 = 0.0f;
-	matrix->m34 = 0.0f;
-	matrix->m44 = 1.0f;
-}
-
-void matrix_4x4_rotation_y(Matrix_4x4* matrix, float32 r)
-{
-	float32 cr = cosf(r);
-	float32 sr = sinf(r);
-	matrix->m11 = cr;
-	matrix->m21 = 0.0f;
-	matrix->m31 = -sr;
-	matrix->m41 = 0.0f;
-	matrix->m12 = 0.0f;
-	matrix->m22 = 1.0f;
-	matrix->m32 = 0.0f;
-	matrix->m42 = 0.0f;
-	matrix->m13 = sr;
-	matrix->m23 = 0.0f;
-	matrix->m33 = cr;
-	matrix->m43 = 0.0f;
-	matrix->m14 = 0.0f;
-	matrix->m24 = 0.0f;
-	matrix->m34 = 0.0f;
-	matrix->m44 = 1.0f;
-}
-
-void matrix_4x4_rotation_z(Matrix_4x4* matrix, float32 r)
-{
-	float32 cr = cosf(r);
-	float32 sr = sinf(r);
-	matrix->m11 = cr;
-	matrix->m21 = sr;
-	matrix->m31 = 0.0f;
-	matrix->m41 = 0.0f;
-	matrix->m12 = -sr;
-	matrix->m22 = cr;
-	matrix->m32 = 0.0f;
-	matrix->m42 = 0.0f;
-	matrix->m13 = 0.0f;
-	matrix->m23 = 0.0f;
-	matrix->m33 = 1.0f;
-	matrix->m43 = 0.0f;
-	matrix->m14 = 0.0f;
-	matrix->m24 = 0.0f;
-	matrix->m34 = 0.0f;
 	matrix->m44 = 1.0f;
 }
 
@@ -270,20 +204,20 @@ void matrix_4x4_camera(Matrix_4x4* matrix, Vec_3f position, Vec_3f forward, Vec_
 	Vec_3f translation = vec_3f_mul(position, -1.0f);
 
 	matrix->m11 = right.x;
-	matrix->m21 = forward.x;
-	matrix->m31 = up.x;
+	matrix->m21 = up.x;
+	matrix->m31 = forward.x;
 	matrix->m41 = 0.0f;
 	matrix->m12 = right.y;
-	matrix->m22 = forward.y;
-	matrix->m32 = up.y;
+	matrix->m22 = up.y;
+	matrix->m32 = forward.y;
 	matrix->m42 = 0.0f;
 	matrix->m13 = right.z;
-	matrix->m23 = forward.z;	
-	matrix->m33 = up.z;
+	matrix->m23 = up.z;	
+	matrix->m33 = forward.z;
 	matrix->m43 = 0.0f;
 	matrix->m14 = (right.x * translation.x) + (right.y * translation.y) + (right.z * translation.z);
-	matrix->m24 = (forward.x * translation.x) + (forward.y * translation.y) + (forward.z * translation.z);
-	matrix->m34 = (up.x * translation.x) + (up.y * translation.y) + (up.z * translation.z);
+	matrix->m24 = (up.x * translation.x) + (up.y * translation.y) + (up.z * translation.z);
+	matrix->m34 = (forward.x * translation.x) + (forward.y * translation.y) + (forward.z * translation.z);
 	matrix->m44 = 1.0f;
 }
 
