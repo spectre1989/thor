@@ -228,7 +228,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		Vec_3f camera_up = quat_mul(camera_rotation, vec_3f(0.0f, 1.0f, 0.0f));
 		Vec_3f camera_forward = quat_mul(camera_rotation, vec_3f(0.0f, 0.0f, 1.0f));
 		
-		constexpr float32 c_camera_speed = 50.0f;
+		constexpr float32 c_camera_speed = 200.0f;
 		Vec_3f target_camera_velocity = vec_3f(0.0f, 0.0f, 0.0f);
 		if (g_input_state.keys['W'])
 		{
