@@ -130,7 +130,7 @@ Quat quat_angle_axis(Vec_3f axis, float32 angle)
 {
 	float32 half_theta = angle * 0.5f;
 	float32 sin_half_theta = sinf(half_theta);
-	return quat(-axis.x * sin_half_theta, -axis.y * sin_half_theta, -axis.z * sin_half_theta, cosf(half_theta));
+	return quat(axis.x * sin_half_theta, axis.y * sin_half_theta, axis.z * sin_half_theta, cosf(half_theta));
 }
 
 Quat quat_euler(Vec_3f euler)
@@ -147,9 +147,9 @@ Vec_3f quat_mul(Quat q, Vec_3f v)
 {
 	// todo(jbr) simplify
 
-	float32 x = (q.scalar * q.scalar * v.x) + (-2.0f * q.scalar * q.yx * v.y) + (2.0f * q.scalar * q.xz * v.z) + (q.zy * q.zy * v.x) + (2.0f * q.zy * q.xz * v.y) + (2.0f * q.zy * q.yx * v.z) + (-1.0f * q.xz * q.xz * v.x) + (-1.0f * q.yx * q.yx * v.x);
-	float32 y = (2.0f * q.scalar * q.yx * v.x) + (q.scalar * q.scalar * v.y) + (-2.0f * q.scalar * q.zy * v.z) + (2.0f * q.zy * q.xz * v.x) + (-1.0f * q.zy * q.zy * v.y) + (q.xz * q.xz * v.y) + (2.0f * q.xz * q.yx * v.z) + (-1.0f * q.yx * q.yx * v.y);
-	float32 z = (-2.0f * q.scalar * q.xz * v.x) + (2.0f * q.scalar * q.zy * v.y) + (q.scalar * q.scalar * v.z) + (2.0f * q.zy * q.yx * v.x) + (-1.0f * q.zy * q.zy * v.z) + (2.0f * q.xz * q.yx * v.y) + (-1.0f * q.xz * q.xz * v.z) + (q.yx * q.yx * v.z);
+	float32 x = (q.scalar * q.scalar * v.x) + (-2.0f * q.scalar * q.yx * v.y) + (2.0f * q.scalar * -q.xz * v.z) + (-q.zy * -q.zy * v.x) + (2.0f * -q.zy * -q.xz * v.y) + (2.0f * -q.zy * q.yx * v.z) + (-1.0f * -q.xz * -q.xz * v.x) + (-1.0f * q.yx * q.yx * v.x);
+	float32 y = (2.0f * q.scalar * q.yx * v.x) + (q.scalar * q.scalar * v.y) + (-2.0f * q.scalar * -q.zy * v.z) + (2.0f * -q.zy * -q.xz * v.x) + (-1.0f * -q.zy * -q.zy * v.y) + (-q.xz * -q.xz * v.y) + (2.0f * -q.xz * q.yx * v.z) + (-1.0f * q.yx * q.yx * v.y);
+	float32 z = (-2.0f * q.scalar * -q.xz * v.x) + (2.0f * q.scalar * -q.zy * v.y) + (q.scalar * q.scalar * v.z) + (2.0f * -q.zy * q.yx * v.x) + (-1.0f * -q.zy * -q.zy * v.z) + (2.0f * -q.xz * q.yx * v.y) + (-1.0f * -q.xz * -q.xz * v.z) + (q.yx * q.yx * v.z);
 	
 	return vec_3f(x, y, z);
 }
