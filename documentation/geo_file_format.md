@@ -2,7 +2,9 @@
 
 
 
+
 # Geo File Format
+Each .geo file contains 1 or more models, first there is a header with information about these models, and then a chunk of compressed mesh data which uses a custom delta compression algorithm.
 
 ## File Layout
 
@@ -21,17 +23,17 @@
 |:-|:-|:-|:-|
 |geo_data_size|uint32|All|I think this is the total size of mesh data (vertices, normals, etc)|
 |texture_names_section_size|uint32|All|Size of texture_names_section|
-|bone_names_section_size|uint32|All|Size of bone_names_section|
+|model_names_section_size|uint32|All|Size of model_names_section|
 |texture_binds_section_size|uint32|All|Size of texture_binds_section|
 |unknown_section_size|uint32|2,3,4,5|Size of unknown_section|
 |texture_names_section|see below|All|Names of all textures used by this geo|
-|bone_names_section|see below|All|Names of bones in geo|
+|model_names_section|see below|All|Names of bones in geo|
 |texture_binds_section|see below|All|Information on how textures are applied to geo|
 |unknown_section|see below|2,3,4,5|No idea what this is for, apears in version 2 and disappears after version 5|
 |geo_name|char[124]|All|Name of this geo|
 |unknown|uint8[12]|All|
 |model_count|uint32|All|Number of models in next section|
-|models|see below|All|Models which make up this geo|
+|models|Model[model_count] see below|All|Models which make up this geo|
 
 ## Texture Names Section
 |Field|Type|Description|
@@ -40,9 +42,11 @@
 |texture_name_offsets|uint32[texture_count]|Offset (in bytes) in texture_names section where each texture name starts|
 |texture_names|char[texture_count][]|Null terminated texture name strings|
 
-## Bone Names Section
+## Model Names Section
 
-Todo
+This section is a series of back-to-back null terminated strings, which are the names of each model in this file. Each model header has a field which is the offset into this section where its name can be found.
+
+Note: If a model has a name which ends with "__(some suffix)", the suffix following the double-underscore is the name of the trick used to render this model.
 
 ## Texture Binds Section
 
@@ -90,7 +94,7 @@ E.g. near=50, far=200, near_fade=25, far_fade=10. Lod will be invisible closer t
 |ErrorTriCount|0x02|Unknown|  
 |UseFallbackMaterial|0x80|Unknown|
 
-## Models
+## Model Structure
 
 A geo contains one or more models, unsure yet why they're broken down like this, suspect either a) individual models are instanced which come from a particular geo file, or b) a geo is a single object, broken down into models based on material.
 
@@ -111,6 +115,7 @@ A geo contains one or more models, unsure yet why they're broken down like this,
 |grid_inv_size|float32|60|?|?|?|?|?|?|Used for collision detection, unsure how|
 |grid_tag|uint32|64|?|?|?|?|?|?|Used for collision detection, unsure how|
 |grid_num_bits|uint32|68|?|?|?|?|?|?|Used for collision detection, unsure how|
+|model_name_offset|uint32|80|80|60|60|60|60|64|Offset in model names section to find the name of this model|
 |triangles|Packed_Mesh_Data|132|132|104|104|104|104|108|Info about size and location of triangle mesh data|
 |vertices|Packed_Mesh_Data|144|144|116|116|116|116|120|Info about size and location of vertex mesh data|
 |normals|Packed_Mesh_Data|156|156|128|128|128|128|132|Info about size and location of normal mesh data|
