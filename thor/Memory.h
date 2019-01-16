@@ -20,6 +20,7 @@ struct Linear_Allocator
 void linear_allocator_create(Linear_Allocator* linear_allocator, uint32 size);
 void linear_allocator_create_sub_allocator(Linear_Allocator* linear_allocator, Linear_Allocator* sub_allocator, uint32 size);
 void linear_allocator_create_sub_allocator(Linear_Allocator* linear_allocator, Linear_Allocator* sub_allocator);
+void linear_allocator_destroy_sub_allocator(Linear_Allocator* linear_allocator, Linear_Allocator* sub_allocator);
 void linear_allocator_destroy(Linear_Allocator* linear_allocator);
 void linear_allocator_reset(Linear_Allocator* linear_allocator);
 uint8* linear_allocator_alloc(Linear_Allocator* linear_allocator, uint32 size);

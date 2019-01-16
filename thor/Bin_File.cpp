@@ -675,8 +675,6 @@ static void geobin_file_read_single(File_Handle file, Geobin* out_geobin, const 
 		Vec_3f euler_degrees = file_read_vec_3f(file);
 		Vec_3f euler = vec_3f_mul(euler_degrees, c_deg_to_rad);
 		ref->rotation = quat_euler(euler);
-
-		// todo(jbr) match the coordinate system of CoX
 	}
 
 	*out_geobin = {};
@@ -932,9 +930,8 @@ void geobin_file_read(
 	Model** out_models, 
 	int32** out_model_instance_count, 
 	Transform*** out_model_instances, 
-	struct Linear_Allocator* model_allocator, // out_models allocated from here
-	Linear_Allocator* instance_allocator, // out_instance_count/out_instances allocated from here
-	Linear_Allocator* temp_allocator) // scratch space
+	struct Linear_Allocator* allocator,
+	Linear_Allocator* temp_allocator)
 {
 	char defnames_file_path[256];
 	string_concat(defnames_file_path, sizeof(defnames_file_path), coh_data_path, "/bin/defnames.bin");
@@ -981,9 +978,9 @@ void geobin_file_read(
 		geo = geo->next;
 	}
 
-	Model* models = (Model*)linear_allocator_alloc(model_allocator, sizeof(Model) * total_model_count);
-	int32* model_instance_count = (int32*)linear_allocator_alloc(instance_allocator, sizeof(int32) * total_model_count);
-	Transform** model_instances = (Transform**)linear_allocator_alloc(instance_allocator, sizeof(Transform*) * total_model_count);
+	Model* models = (Model*)linear_allocator_alloc(allocator, sizeof(Model) * total_model_count);
+	int32* model_instance_count = (int32*)linear_allocator_alloc(allocator, sizeof(int32) * total_model_count);
+	Transform** model_instances = (Transform**)linear_allocator_alloc(allocator, sizeof(Transform*) * total_model_count);
 	
 	// as we go write models/model instances here
 	Model* current_model = models;
@@ -1020,7 +1017,7 @@ void geobin_file_read(
 		string_concat(geo_file_path, sizeof(geo_file_path), geo_base_path, geo->relative_file_path);
 
 		File_Handle geo_file = file_open_read(geo_file_path);
-		geo_file_read(geo_file, model_names, current_model, model_count, model_allocator, &geo_temp_allocator);
+		geo_file_read(geo_file, model_names, current_model, model_count, allocator, &geo_temp_allocator);
 		current_model += model_count;
 		file_close(geo_file);
 		
@@ -1036,7 +1033,7 @@ void geobin_file_read(
 				instance = instance->next;
 			}
 
-			Transform* transforms = (Transform*)linear_allocator_alloc(instance_allocator, sizeof(Transform) * instance_count);
+			Transform* transforms = (Transform*)linear_allocator_alloc(allocator, sizeof(Transform) * instance_count);
 
 			Transform* current_transform = transforms;
 			instance = geo_model->instances;

@@ -1,6 +1,5 @@
 #include "Graphics.h"
 
-#include "Bin_File.h" // todo(jbr) shouldn't have this dependency
 #include "File.h"
 #include "Memory.h"
 #include <vulkan/vulkan.h>
@@ -1089,7 +1088,7 @@ void graphics_draw(Graphics_State* graphics_state, Matrix_4x4* view_matrix)
 	for (UBO* ubo = graphics_state->ubos; ubo != ubos_end; ++ubo)
 	{
 		Matrix_4x4* dst_transforms;
-		VkResult result = vkMapMemory(
+		VkResult result = vkMapMemory( // todo(jbr) is it faster to never unmap this?
 			graphics_state->device, 
 			graphics_state->ubo_device_memory, 
 			ubo->device_memory_offset, 

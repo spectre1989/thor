@@ -75,8 +75,6 @@ Vec_3f buffer_read_vec_3f(uint8** inout_buffer)
 
 void buffer_read_bytes(uint8** inout_buffer, uint32 byte_count, uint8* out_bytes)
 {
-	// todo(jbr) would this be faster copying uint32/64?
-
 	uint8* src = *inout_buffer;
 	uint8* dst = out_bytes;
 	uint8* end = src + byte_count;

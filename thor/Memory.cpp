@@ -23,6 +23,16 @@ void linear_allocator_create_sub_allocator(Linear_Allocator* linear_allocator, L
 	linear_allocator_create_sub_allocator(linear_allocator, sub_allocator, linear_allocator->bytes_available);
 }
 
+void linear_allocator_destroy_sub_allocator(Linear_Allocator* linear_allocator, Linear_Allocator* sub_allocator)
+{
+	assert(sub_allocator->memory == (linear_allocator->next - sub_allocator->size));
+
+	linear_allocator->bytes_available += sub_allocator->size;
+	linear_allocator->next = sub_allocator->memory;
+
+	*sub_allocator = {};
+}
+
 void linear_allocator_destroy(Linear_Allocator* linear_allocator)
 {
 	delete[] linear_allocator->memory;

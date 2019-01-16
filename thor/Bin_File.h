@@ -26,6 +26,5 @@ void geobin_file_read(
 	struct Model** out_models, 
 	int32** out_model_instance_count, 
 	Transform*** out_model_instances, 
-	struct Linear_Allocator* model_allocator, // out_models allocated from here
-	Linear_Allocator* instance_allocator, // out_instance_count/out_instances allocated from here
-	Linear_Allocator* temp_allocator); // scratch space
+	struct Linear_Allocator* allocator,
+	Linear_Allocator* temp_allocator);

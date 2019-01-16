@@ -33,7 +33,7 @@ struct UBO
 		int32 instance_count;
 	};
 
-	Matrix_4x4* world_transforms; // todo(jbr) can get rid of this I think?
+	Matrix_4x4* world_transforms;
 	int32 transform_count;
 	uint64 device_memory_offset;
 	struct VkDescriptorSet_T* descriptor_set;

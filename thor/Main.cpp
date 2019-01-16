@@ -114,17 +114,17 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 	assert(string_length(cmd_line))
 	
-	Linear_Allocator allocator_snapshot = allocator; // use this to restore allocator later
-
 	const char* coh_data_path = cmd_line;
 
 	char geobin_file_path[256];
 	string_concat(geobin_file_path, sizeof(geobin_file_path), coh_data_path, "/geobin/maps/City_Zones/City_01_01/City_01_01.bin");
 		
-	// store the model instances parsed from geobin here, it isn't permanent but needs to live for a little while
-	// until the data gets rearranged and stored in an optimal order by graphics_init(), then this can be chucked away
-	Linear_Allocator model_instance_allocator;
-	linear_allocator_create_sub_allocator(&allocator, &model_instance_allocator, megabytes(32));
+	// create two allocators for geobin read
+	// 1 - allocator for the results of loading the geobin
+	// 2 - temp allocator just for the function
+	// both are thrown away, but slightly different lifetimes
+	Linear_Allocator geobin_read_allocator;
+	linear_allocator_create_sub_allocator(&allocator, &geobin_read_allocator, megabytes(32));
 
 	Linear_Allocator temp_allocator;
 	linear_allocator_create_sub_allocator(&allocator, &temp_allocator);
@@ -143,11 +143,11 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		&models,
 		&model_instance_count,
 		&model_instances,
-		/*model_allocator*/ &permanent_allocator, // todo(jbr) models don't need to be permanent, can just put it all in a "not quite as temp as temp" allocator
-		&model_instance_allocator, 
+		&geobin_read_allocator, 
 		&temp_allocator);
 	file_close(geobin_file);
 
+	// reset and reuse for graphics_init
 	linear_allocator_reset(&temp_allocator);
 
 	Graphics_State* graphics_state = (Graphics_State*)linear_allocator_alloc(&permanent_allocator, sizeof(Graphics_State));
@@ -165,7 +165,8 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 		&temp_allocator);
 
 	// now throw away all allocators after permanent allocator
-	allocator = allocator_snapshot;
+	linear_allocator_destroy_sub_allocator(&allocator, &temp_allocator);
+	linear_allocator_destroy_sub_allocator(&allocator, &geobin_read_allocator);
 
 	bool32 was_mouse_down = 0;
 	int32 mouse_x_on_mouse_down = 0;

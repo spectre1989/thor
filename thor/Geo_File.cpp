@@ -158,7 +158,13 @@ static float32* geo_unpack_delta_compressed_floats(File_Handle file, uint32 defl
 	return nullptr;
 }
 
-void geo_file_read(File_Handle file, const char** model_names, Model* out_models, int32 model_count, Linear_Allocator* model_allocator, Linear_Allocator* temp_allocator)
+void geo_file_read(
+	File_Handle file, 
+	const char** model_names, 
+	Model* out_models, 
+	int32 model_count, 
+	Linear_Allocator* allocator, 
+	Linear_Allocator* temp_allocator)
 {
 	int32* model_indices = (int32*)linear_allocator_alloc(temp_allocator, sizeof(int32) * model_count);
 	for (int32 i = 0; i < model_count; ++i)
@@ -377,9 +383,9 @@ void geo_file_read(File_Handle file, const char** model_names, Model* out_models
 		Model* model = &out_models[i];
 		*model = {};
 		model->vertex_count = model_vertex_count;
-		model->vertices = (float32*)linear_allocator_alloc(model_allocator, sizeof(float32) * 3 * model_vertex_count);
+		model->vertices = (float32*)linear_allocator_alloc(allocator, sizeof(float32) * 3 * model_vertex_count);
 		model->triangle_count = model_triangle_count;
-		model->triangles = (uint32*)linear_allocator_alloc(model_allocator, sizeof(uint32) * 3 * model_triangle_count);
+		model->triangles = (uint32*)linear_allocator_alloc(allocator, sizeof(uint32) * 3 * model_triangle_count);
 
 		geo_unpack_delta_compressed_floats(
 			file, 
