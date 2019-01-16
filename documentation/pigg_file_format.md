@@ -1,7 +1,7 @@
 
 # Pigg File Format
 
-A Pigg is a collection of individual files, packaged into a single file. Games often use methods like this to improve file I/O performance.
+A Pigg is a collection of individual files, packaged into a single file. The game (probably) implemented a virtual file system which would selectively load data from within these Pigg files on demand. Games often use methods like this to improve file I/O performance, and compression.
 
 ## File Layout
 
