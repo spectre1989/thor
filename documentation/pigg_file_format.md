@@ -3,6 +3,18 @@
 
 A Pigg is a collection of individual files, packaged into a single file. The game (probably) implemented a virtual file system which would selectively load data from within these Pigg files on demand. Games often use methods like this to improve file I/O performance, and compression.
 
+The virtual file system directory as of Issue 24 contains the following top-level directories:
+* bin - a selection of game data stored in .bin files, everything from superhero origins to a Def (prefab) lookup table
+* fonts
+* geobin - all the Geobin .bin files live here
+* object_library - .geo files for scenery objects
+* player_library - .geo files for players
+* scenes
+* shaders
+* sound
+* texts
+* texture_library
+
 ## File Layout
 
 |Field|Type|Description|
