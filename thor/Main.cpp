@@ -279,7 +279,7 @@ int CALLBACK WinMain(HINSTANCE instance_handle, HINSTANCE /*prev_instance_handle
 
 		if (was_sleep_granularity_set && frame_remaining >= 3.0f) // sleep can overlseep, so always spin for the last 2ms
 		{
-			DWORD sleep_for_ms = (DWORD)frame_remaining - 2;
+			DWORD sleep_for_ms = (DWORD)frame_remaining - 2; // todo(jbr) make sure when sleeping that error doesn't accumulate
 			assert(sleep_for_ms);
 			Sleep(sleep_for_ms);
 		}
